@@ -72,6 +72,9 @@ The primary agent provides:
 
 ## Review rules
 
+- Run git commands plain, with no pipes or chaining (`| cat`, `| head`,
+  `| grep`, `&&` are all denied by your shell policy). For reading or searching
+  files, use the native `read`, `grep`, and `glob` tools.
 - Review only what the diff introduces or directly causes. Do not report
   pre-existing issues unless the diff makes them worse.
 - Do not speculate. Every finding needs a concrete `file:line` and a fix.

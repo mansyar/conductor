@@ -105,6 +105,9 @@ Conductor track. The primary agent remains responsible for Conductor state.
 
 ## Rules
 
+- Use the native `grep`, `glob`, and `read` tools for search and file reading.
+  Never invoke `grep`, `rg`, `findstr`, `cat`, or `find` through shell; shell is
+  restricted to Git and the configured verification commands.
 - Work only on the assigned phase. Do not start another phase.
 - Stay within the `Touches` paths in the brief.
 - If the phase goal requires touching a file outside `Touches`, make the
