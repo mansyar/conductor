@@ -319,8 +319,11 @@ Conductor ships two project-local subagent profiles:
 - `conductor-reviewer` — reviews a track read-only and returns findings.
 
 1. **Detect the Host:** Install these files only when the host is OpenCode.
-   Detect it by the presence of `.opencode/`, `opencode.json`, or
-   `opencode.jsonc`. On other hosts, skip this section and note that
+   Detect it when running inside OpenCode (`OPENCODE`, `OPENCODE_SESSION_ID`,
+   or `AI_AGENT=opencode` is set), or when the project root contains
+   `.opencode/`, `opencode.json`, or `opencode.jsonc`. A project that uses only
+   global OpenCode configuration has none of those files; the environment check
+   covers that case. On other hosts, skip this section and note that
    `conductor-implement` and `conductor-review` will fall back to the host's
    general subagent.
 2. **Check for Existing Files:** If `.opencode/agents/conductor-phase.md` or
@@ -456,8 +459,9 @@ the optional project instructions, then Section 3. The old directory remains in
 
 ### 2.9 Optional Project Instructions (AGENTS.md)
 
-Offer this only on OpenCode. OpenCode loads `AGENTS.md` from the project root and
-parent directories. This is an optional convenience, not a requirement.
+Offer this only on OpenCode, using the same host detection as Section 2.7.
+OpenCode loads `AGENTS.md` from the project root and parent directories. This is
+an optional convenience, not a requirement.
 
 1. **Ask:** Use a **single-choice question**:
     - **Add managed block (Recommended):** add the block below.

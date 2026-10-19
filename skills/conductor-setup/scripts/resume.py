@@ -54,6 +54,15 @@ def _has_runtime_ignore():
 
 
 def _is_opencode_project():
+    """Detects OpenCode from the running host or project-local config.
+
+    A project can use OpenCode with only a global config, so the environment
+    check matters when the project has no .opencode/ or opencode.json(c).
+    """
+    if os.environ.get("OPENCODE") or os.environ.get("OPENCODE_SESSION_ID"):
+        return True
+    if os.environ.get("AI_AGENT", "").lower() == "opencode":
+        return True
     return bool(
         os.path.isdir(".opencode")
         or os.path.isfile("opencode.json")
