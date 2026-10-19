@@ -17,7 +17,7 @@ move the track through review to a pull request.
 -   **Precise Execution:** Do not skip steps. Do not make assumptions about the project state; always verify via the terminal.
 -   **Tool Validation:** You MUST validate the success of every tool call. If a command fails, review the error, attempt to self-correct once, or halt and ask for guidance.
 -   **Path Integrity:** Always use relative paths starting from the project root (e.g., `conductor/tracks.md`).
--   **Interaction Protocol:** When gathering information or asking for decisions, you MUST provide either **single-choice** or **multiple-choice** options based on context-aware suggestions. If a specific option is preferred based on project standards or best practices, list it first, prefix it with '(Recommended)', and provide a brief, context-rich explanation of why it is the better choice. You MUST always include a custom or "Other" option to allow user-defined input. Avoid asking raw, open-ended questions without suggestions.
+-   **Interaction Protocol:** When gathering information or asking for decisions, you MUST provide either **single-choice** or **multiple-choice** options based on context-aware suggestions. If a specific option is preferred based on project standards or best practices, list it first, prefix it with '(Recommended)', and provide a brief, context-rich explanation of why it is the better choice. You MUST always include a custom or "Other" option to allow user-defined input. Avoid asking raw, open-ended questions without suggestions. When the host provides a native question tool (OpenCode), PREFER it for structured choices and confirmations, and batch independent questions into one call.
 -   **Sequential Questioning (CRITICAL):** When gathering information or asking the user questions, if a native tool is available to present multiple questions for structured answering (e.g., a modal or form tool), you may use it to group questions. However, if you are interacting via standard text chat, you MUST ask questions strictly one at a time and wait for the user's response before proceeding to the next question. Do NOT output multiple questions in a single chat response.
 -   **State Ownership:** Only you write `plan.md`, `tracks.md`, `metadata.json`, `conductor/index.md`, `review.md`, and `pr.md`. Phase subagents write code, tests, and their own evidence file.
 
@@ -662,6 +662,14 @@ and archives merged tracks in one flow.
     -   Archiving tracks.
 
     Allow **All**, **Select**, and **Skip** for each.
+
+    On hosts with a native question tool (OpenCode), present these
+    confirmations with it: one grouped call containing one single-choice
+    question per category (**All**, **Select**, **Skip**), and when the user
+    chooses **Select**, a follow-up multi-select question listing that
+    category's candidates. Use a plain Yes/No question for the unproven
+    squash-or-rebase confirmation in step 3. On other hosts, fall back to the
+    Interaction Protocol: numbered options in text, one question at a time.
 
 5.  **Delete local branches:**
     -   `git branch -d <branch>` when the branch is an ancestor of the base.
