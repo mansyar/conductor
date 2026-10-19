@@ -128,8 +128,8 @@ git diff --shortstat <range> -- . ':!conductor'
 -   **Small/medium:** at most 300 changed lines and 15 changed files. Review the
     full diff in one pass.
 -   **Large:** review each phase checkpoint diff, then a cross-phase integration
-    diff. Merge duplicate findings. Ask for confirmation before a large review
-    only when the user is waiting interactively; otherwise proceed.
+    diff. Merge duplicate findings. Do not ask for confirmation; proceed
+    automatically and note the volume strategy in the review report.
 
 Ignore generated files, lockfiles, vendored code, and binary assets in the code
 review. Note them only if the diff changes their source.
