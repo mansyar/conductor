@@ -676,6 +676,12 @@ and archives merged tracks in one flow.
     -   `git branch -D <branch>` only with PR-merged proof and explicit
         confirmation.
     -   If the current branch is the candidate, check out the base first.
+    -   If deletion fails because the branch is checked out in another
+        worktree, locate it with `git worktree list`. If it is not the main
+        worktree, detach its HEAD with `git -C <path> checkout --detach` and
+        retry the deletion. Never use `--force` there and never delete the
+        worktree directory. If it is the main worktree, stop and ask the user
+        to switch it to another branch first.
     -   Never delete an unmerged branch, a branch with commits newer than the PR
         head, or a branch belonging to a dirty worktree.
 
