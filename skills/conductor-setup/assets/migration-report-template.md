@@ -32,3 +32,6 @@
   the spec/plan to the v2 contract.
 - The pre-migration directory is backed up at
   `.conductor/backups/conductor-v1-<timestamp>/`.
+- v2 runs sequentially in the current worktree and creates no worktrees. If
+  `.conductor/worktrees/` exists, run `git worktree prune` and delete the
+  directory manually after confirming the entries are no longer needed.

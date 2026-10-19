@@ -671,15 +671,7 @@ and archives merged tracks in one flow.
     squash-or-rebase confirmation in step 3. On other hosts, fall back to the
     Interaction Protocol: numbered options in text, one question at a time.
 
-5.  **Detach merged worktrees:** For each `.conductor/worktrees/` entry whose
-    branch is merged and whose directory is clean, detach its HEAD:
-    `git -C <path> checkout --detach`. Detaching releases the branch so step 6
-    can delete it while keeping the worktree directory intact. Never detach or
-    modify the main worktree, use `--force`, or touch a dirty worktree. Do not
-    remove the worktree directory; if the user wants it gone, they remove it
-    manually with `git worktree remove` afterward.
-
-6.  **Delete local branches:**
+5.  **Delete local branches:**
     -   `git branch -d <branch>` when the branch is an ancestor of the base.
     -   `git branch -D <branch>` only with PR-merged proof and explicit
         confirmation.
@@ -687,21 +679,20 @@ and archives merged tracks in one flow.
     -   Never delete an unmerged branch, a branch with commits newer than the PR
         head, or a branch belonging to a dirty worktree.
 
-7.  **Delete remote branches:** Check `git ls-remote --heads origin <branch>`.
+6.  **Delete remote branches:** Check `git ls-remote --heads origin <branch>`.
     If it still exists and the user confirmed, run
     `git push origin --delete <branch>`. Do not delete a remote branch whose PR
     is not merged.
 
-8.  **Stop background processes:** Before archiving, end every background
-    process started from the project working directory or a Conductor worktree
-    during this track's work — dev servers, file watchers, and watch-mode test
-    runners. On OpenCode, terminate the session's background shells whose
-    working directory is the project root or under `.conductor/worktrees/`. A
-    process holding a lock on a directory will make the `git mv` archive step
-    fail, especially on Windows. If a background process cannot be attributed
-    to this project, report it and leave it running.
+7.  **Stop background processes:** Before archiving, end every background
+    process started from the project working directory during this track's
+    work — dev servers, file watchers, and watch-mode test runners. On
+    OpenCode, terminate the session's background shells whose working directory
+    is the project root. A process holding a lock on a directory will make the
+    `git mv` archive step fail, especially on Windows. If a background process
+    cannot be attributed to this project, report it and leave it running.
 
-9.  **Archive merged tracks:** For each confirmed `[x]` track whose branch is
+8.  **Archive merged tracks:** For each confirmed `[x]` track whose branch is
     merged, or `[-]` track whose revert PR is merged:
     -   Require a clean tree and the base branch.
     -   Stop if `conductor/tracks/<track-id>/` is missing or
@@ -726,13 +717,12 @@ and archives merged tracks in one flow.
         Commit one track at a time:
         `chore(conductor): Archive track '<track-id>'`.
 
-10. **No purge:** Never permanently delete an archived track. There is no
+9.  **No purge:** Never permanently delete an archived track. There is no
     automatic retention or purge step. A user who wants deletion must do it
     manually with a separate explicit confirmation.
 
-11. Report stopped background processes, deleted branches, detached worktrees,
-    archived tracks, skipped candidates, and any branch whose merge could not
-    be proven.
+10. Report stopped background processes, deleted branches, archived tracks,
+    skipped candidates, and any branch whose merge could not be proven.
 
 ---
 

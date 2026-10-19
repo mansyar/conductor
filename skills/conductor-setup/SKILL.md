@@ -445,6 +445,10 @@ without changing anything.
       old `spec.md` as an import source, then convert or archive the old track.
     - **Completed legacy track:** keep it as historical, or recreate it only if
       the team wants the new review/evidence trail.
+    - **Legacy worktrees:** if `.conductor/worktrees/` exists with entries,
+      note that v2 runs sequentially in the current worktree and creates no
+      worktrees. Recommend the user run `git worktree prune` and delete the
+      directory manually after checking the entries are no longer needed.
     - **Reverted/abandoned legacy track:** leave it marked `[-]`; do not revive
       it automatically.
 
@@ -552,7 +556,7 @@ Remove any Capabilities line that does not exist on disk. Use
 
 4.  **Ignore Runtime State:** Ensure the project's `.gitignore` contains
     `.conductor/` (create the file if needed). Do not ignore `conductor/`.
-    Runtime evidence, worktrees, and run state live under `.conductor/`.
+    Runtime evidence and run state live under `.conductor/`.
 
 5.  **Integrity Check:** You MUST verify the existence of all linked files on disk.
 

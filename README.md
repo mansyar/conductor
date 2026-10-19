@@ -375,8 +375,7 @@ separate confirmations:
 
 - delete local merged branches;
 - delete remote branches that still exist;
-- detach clean merged worktrees (the directories are kept, not removed);
-- stop background processes started from the project or its worktrees;
+- stop background processes started from the project directory;
 - archive merged `[x]` tracks and `[-]` tracks whose revert PR merged.
 
 Archiving uses `git mv`, removes the registry line, keeps `status: complete` or
