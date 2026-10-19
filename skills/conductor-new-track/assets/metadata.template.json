@@ -1,0 +1,30 @@
+{
+  "id": "<track-id>",
+  "title": "<Track Title>",
+  "type": "<mvp|feature|bug|chore|refactor>",
+  "status": "new",
+  "priority": "<high|medium|low>",
+  "depends_on": [],
+  "created_at": "<ISO-8601 timestamp>",
+  "updated_at": "<ISO-8601 timestamp>",
+  "spec": "spec.md",
+  "plan": "plan.md",
+  "branch": "<prefix>/<track-id>",
+  "base_branch": "<base-branch>",
+  "base_sha": "<base-sha>",
+  "progress": {
+    "phases_total": 0,
+    "phases_verified": 0,
+    "tasks_total": 0,
+    "tasks_done": 0
+  },
+  "last_checkpoint": null,
+  "review_verdict": null,
+  "review_rounds": 0,
+  "doc_sync": "pending",
+  "pr_url": null,
+  "pr_state": null,
+  "reverted_at": null,
+  "revert_commit": null,
+  "revert_pr_url": null
+}

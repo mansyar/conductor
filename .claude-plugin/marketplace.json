@@ -7,7 +7,7 @@
     {
       "name": "conductor",
       "source": "./",
-      "description": "Conductor is a set of modular AI agent skills for Claude Code that enables Spec-Driven Development."
+      "description": "Conductor is a set of modular AI agent skills for Spec-Driven Development across AI coding agents."
     }
   ]
 }
