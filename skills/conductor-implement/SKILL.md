@@ -684,12 +684,22 @@ and archives merged tracks in one flow.
     `git push origin --delete <branch>`. Do not delete a remote branch whose PR
     is not merged.
 
-7.  **Remove worktrees:** For each `.conductor/worktrees/` entry whose branch is
+7.  **Stop background processes:** Before removing worktrees or archiving, end
+    every background process started from the project working directory or a
+    Conductor worktree during this track's work — dev servers, file watchers,
+    and watch-mode test runners. On OpenCode, terminate the session's
+    background shells whose working directory is the project root or under
+    `.conductor/worktrees/`. A process holding a lock on a directory will make
+    the worktree removal and `git mv` archive steps fail, especially on
+    Windows. If a background process cannot be attributed to this project,
+    report it and leave it running.
+
+8.  **Remove worktrees:** For each `.conductor/worktrees/` entry whose branch is
     merged and whose directory is clean, offer to remove it with
     `git worktree remove <path>`. Never use `--force` or remove a dirty
     worktree.
 
-8.  **Archive merged tracks:** For each confirmed `[x]` track whose branch is
+9.  **Archive merged tracks:** For each confirmed `[x]` track whose branch is
     merged, or `[-]` track whose revert PR is merged:
     -   Require a clean tree and the base branch.
     -   Stop if `conductor/tracks/<track-id>/` is missing or
@@ -714,12 +724,13 @@ and archives merged tracks in one flow.
         Commit one track at a time:
         `chore(conductor): Archive track '<track-id>'`.
 
-9.  **No purge:** Never permanently delete an archived track. There is no
+10. **No purge:** Never permanently delete an archived track. There is no
     automatic retention or purge step. A user who wants deletion must do it
     manually with a separate explicit confirmation.
 
-10. Report deleted branches, removed worktrees, archived tracks, skipped
-    candidates, and any branch whose merge could not be proven.
+11. Report stopped background processes, deleted branches, removed worktrees,
+    archived tracks, skipped candidates, and any branch whose merge could not
+    be proven.
 
 ---
 
