@@ -42,7 +42,8 @@ move the track through review to a pull request.
     -   `commands.test`, `commands.coverage`, `commands.lint`,
         `commands.format`, `commands.typecheck`, `commands.build`,
         `commands.verify_phase`
-    -   `verification.retry`, `verification.evidence`
+    -   `verification.retry`. Evidence paths are fixed:
+        `conductor/tracks/<track-id>/verification/` and `.conductor/evidence/`.
     -   `review.strict`, `review.issues`
     -   `pr.enabled`, `pr.tool`, `pr.base`
 4.  **Load Style Guides:** List `conductor/code_styleguides/`. Pass the relevant
@@ -79,8 +80,9 @@ move the track through review to a pull request.
 4.  **Confirm:** Show the track ID, title, branch, and current phase. Ask for
     confirmation with a **Yes/No question** when the selection was inferred.
 5.  **Read `metadata.json`:** Require `id`, `type`, `status`, `branch`,
-    `base_branch`, and `base_sha`. If `branch` is missing, this is a legacy
-    track; use the fallback in Section 3.3.
+    `base_branch`, and `base_sha`. `base_sha` may be `null` only when the
+    repository has no commits. If `branch` is missing, this is a legacy track;
+    use the fallback in Section 3.2.
     -   If `metadata.legacy` is `true`, stop before creating a branch or running
         any phase. Announce that the track predates Conductor 2.0 and point to
         `conductor/migration-report.md`. Offer to recreate it through
@@ -156,8 +158,12 @@ Validate that:
 
 -   `none` → ready.
 -   A phase ID → that phase must have `**Status:** verified`.
--   A track ID → that track must be `[x]` in the registry and merged into the
-    base branch.
+-   A track ID → resolve it in `tracks.md`; if it is absent there, read
+    `conductor/archive/<track-id>/metadata.json`. The dependency is satisfied
+    only when `metadata.status` is `complete` and the merge is proven
+    (`pr_state: "merged"`, `merged_at`, `merge_commit`, or the archived base is
+    an ancestor of the current base). A `legacy`, `reverted`, or `abandoned`
+    dependency is not satisfied.
 
 If a dependency is unmet, stop and explain which phase or track is blocking.
 
@@ -169,6 +175,10 @@ If a dependency is unmet, stop and explain which phase or track is blocking.
     status is not `verified`.
 -   **`task P2.T3`:** run the phase subagent with a brief limited to that task
     and its sub-tasks.
+    -   If the phase is still `pending`, run Section 4.4 first so the phase is
+        `in_progress`, `phase_base` is recorded, and the run file exists. If the
+        phase is `verified`, require an explicit redo confirmation before
+        resetting it.
     -   Verify the task with the configured command(s).
     -   Mark the task `[x]`, update `metadata.progress.tasks_done` and
         `updated_at`, and commit `plan.md` + `metadata.json`:
@@ -437,9 +447,14 @@ PR without it.
     path is `verification/phase-R<n>.md`.
 3.  Return to `conductor-review` for a delta re-review. Maximum **2** review
     fix rounds.
-4.  If review is still `BLOCK` after the round cap, stop. Do not mark the track
-    complete, push, or open a PR. Hand the unresolved findings to the user.
-5.  If review passes, run the **post-review documentation sync**:
+4.  If review is still `BLOCK` after the round cap, read `review.md`:
+    -   If every remaining blocking finding has an entry in `## Overrides`
+        naming the approving user, date, reason, and scope, carry that override
+        into `pr.md` and continue to step 5.
+    -   Otherwise stop. Do not mark the track complete, push, or open a PR. Hand
+        the unresolved findings to the user.
+5.  If review passes, or every remaining blocking finding is overridden, run the
+    **post-review documentation sync**:
     -   Read `review.md` and the review-fix diff.
     -   Update `spec.md`, `tech-stack.md`, `product.md`, or
         `product-guidelines.md` only where behavior or contracts changed.
@@ -462,7 +477,8 @@ PR without it.
 1.  Recompute `metadata.progress` from the plan.
 2.  Confirm `metadata.doc_sync` is `updated` or `none`, and set `updated_at`.
 3.  Leave `metadata.status` as `in_progress` and the registry as `[~]`.
-    Completion is recorded after the PR exists.
+    Completion is recorded after the PR step, or after the local completion path
+    when there is no remote or PRs are disabled.
 4.  Do not commit yet.
 
 ### 8.2 Generate the PR Body
@@ -478,13 +494,17 @@ Stage `metadata.json` and `pr.md`. Commit:
 
 ### 8.4 Push and Create the PR
 
-1.  Detect a remote with `git remote`.
-2.  If a remote exists:
-    -   Push: `git push -u origin <branch>` (or `git push` when the upstream is
-        already set).
-    -   Use `pr.tool` from the Workflow Config. Default: `gh`.
-    -   Build the title: `<type>(<scope>): <track title>`.
-    -   Create:
+1.  Detect a remote with `git remote`. If there is no remote, skip push and PR
+    creation; continue to Section 8.5 with `pr_url: null` and `pr_state: null`.
+2.  If a remote exists, push: `git push -u origin <branch>` (or `git push` when
+    the upstream is already set).
+3.  Read `pr.enabled`. If it is false, skip PR creation and continue to Section
+    8.5. Keep `pr_url: null` and `pr_state: null`; the pushed branch is the
+    deliverable.
+4.  If `pr.enabled` is true, use `pr.tool` from the Workflow Config. Default:
+    `gh`. Build the title `<type>(<scope>): <track title>` and use
+    `pr.base or base_branch` as the base.
+    -   **`gh`:**
         ```bash
         gh pr create \
           --base <pr.base or base_branch> \
@@ -492,27 +512,35 @@ Stage `metadata.json` and `pr.md`. Commit:
           --title "<type>(<scope>): <title>" \
           --body-file conductor/tracks/<track-id>/pr.md
         ```
-    -   If the PR already exists, inspect it first:
-        -   `OPEN`: update it with
-            `gh pr edit <url> --body-file conductor/tracks/<track-id>/pr.md`.
-        -   `MERGED`: skip creation and carry `pr_state: "merged"` to Section
-            8.5.
-        -   `CLOSED`: stop. Ask whether to reopen it or open a new PR. Do not
-            mark the track complete while its PR is closed and unmerged.
-    -   Capture the PR URL for Section 8.5. Do not record it in metadata yet.
-    -   If `gh` is missing or unauthenticated: push, save `pr.md`, and give the
-        user the compare URL:
-        `https://github.com/<owner>/<repo>/compare/<base_branch>...<branch>?expand=1`.
-        Treat this as local completion with no `pr_url`.
-3.  If no remote exists, skip push/PR and continue to Section 8.5.
+        Inspect an existing PR with `gh pr view`. If it is `OPEN`, update it with
+        `gh pr edit <url> --body-file conductor/tracks/<track-id>/pr.md`. If it
+        is `MERGED`, carry `pr_state: "merged"` to Section 8.5. If it is
+        `CLOSED`, stop and ask whether to reopen it or open a new PR; never mark
+        a track complete while its PR is closed and unmerged.
+    -   **`glab`:** use the equivalent `glab mr create` and `glab mr view`/
+        `glab mr update` commands with the same source branch, target branch,
+        title, and `pr.md` body. Apply the same `OPEN`/`MERGED`/`CLOSED`
+        handling.
+    -   **Other tool:** do not invent commands. Push the branch, write `pr.md`,
+        give the user the host's compare URL, and treat PR creation as
+        unavailable.
+5.  Capture the PR URL for Section 8.5. Do not record it in metadata yet.
+6.  If the configured tool is missing, unauthenticated, or fails: push, save
+    `pr.md`, give the user the compare URL, and record `pr_state:
+    "unavailable"` for Section 8.5.
+    -   GitHub:
+        `https://github.com/<owner>/<repo>/compare/<base>...<branch>?expand=1`
+    -   GitLab: the equivalent merge-request URL for the repository.
 
 ### 8.5 Mark the Track Complete
 
 1.  Update `tracks.md`: `[~]` → `[x]`.
 2.  Update `metadata.json`:
     -   `status: "complete"`
-    -   `pr_url` and `pr_state: "open"` when a PR was created, `"merged"` when
-        it was already merged; otherwise leave them `null`.
+    -   `pr_url`: the created PR URL, or `null`.
+    -   `pr_state`: `"open"` when a PR was created, `"merged"` when it was
+        already merged, `"unavailable"` when PR creation was configured but
+        could not run, and `null` when PRs are disabled or there is no remote.
     -   `updated_at`
 3.  Stage `tracks.md` and `metadata.json`. Commit:
     `chore(conductor): Mark track '<title>' as complete`.
@@ -600,14 +628,16 @@ and archives merged tracks in one flow.
     -   Fetch the base when a remote exists and `git.fetch` is true.
 
 2.  **Refresh PR state:** For every `[x]` track with `pr_url` and every `[-]`
-    track with `revert_pr_url`, query the PR when `gh` is available:
+    track with `revert_pr_url`, query the PR with the configured `pr.tool`
+    (default `gh`). For `gh`:
 
     ```bash
     gh pr view <url> --json state,mergeCommit,headRefOid,mergedAt,url
     ```
 
-    Keep the result in memory. Do not write metadata until the user confirms
-    cleanup. If `gh` is missing or unauthenticated, mark the state unknown and
+    For `glab`, use the equivalent merge-request view command. Keep the result
+    in memory. Do not write metadata until the user confirms cleanup. If the
+    configured tool is missing or unauthenticated, mark the state unknown and
     use local proof only.
 
 3.  **Prove the merge before deleting anything:**
@@ -691,7 +721,8 @@ and archives merged tracks in one flow.
     explicitly asks and no subagent is available.
 -   Do not skip the phase verification because the subagent says it passed.
 -   Do not mark a phase `verified` with a failed or unrun required check.
--   Do not mark a track complete before review passes.
+-   Do not mark a track complete before review passes, unless every remaining
+    blocking finding has an explicit user override recorded in `review.md`.
 -   Do not mark it complete before the PR exists when a remote and `pr.enabled`
     are configured, unless PR creation is unavailable.
 -   Do not push or open a PR before review and post-review doc sync.

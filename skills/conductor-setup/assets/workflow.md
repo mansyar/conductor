@@ -44,8 +44,6 @@ coverage:
   scope: "{{new-code|project}}"
 verification:
   layers: ["{{LAYER}}"]
-  evidence: "conductor/tracks/<track-id>/verification/phase-<n>.md"
-  evidence_dir: ".conductor/evidence"
   retry: 2
   manual_exceptions: ["{{CREDENTIALS_OR_HARDWARE}}"]
 git:
@@ -282,7 +280,9 @@ A track is complete when:
    explicit user override recorded in `review.md`.
 4. Post-review documentation sync is complete.
 5. The registry and `metadata.json` show the track as complete.
-6. The branch is pushed and a PR is open, when a remote exists.
+6. When a remote exists, the branch is pushed. When `pr.enabled` is true, a PR
+   is open or `pr_state: "unavailable"` records that PR creation could not run.
+   When `pr.enabled` is false, no PR is expected.
 
 ## Emergency Procedures
 

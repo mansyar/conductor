@@ -246,12 +246,16 @@ root-cause hypothesis, and the regression test.
 
 After the spec and plan are approved, Conductor:
 
-1. Resolves the base branch and fetches it.
+1. Resolves the base branch and fetches it when `git.fetch` is true.
 2. Checks out `<prefix>/<track-id>` in the current worktree.
 3. Writes `metadata.json`, `spec.md`, `plan.md`, and the track `index.md`.
 4. Adds the track to `tracks.md` and ensures the Tracks section exists in
    `conductor/index.md`.
 5. Commits the scaffold on the new branch.
+
+Track dependencies are resolved from `tracks.md`; if a dependency was archived
+after merge, Conductor reads `conductor/archive/<track-id>/metadata.json` and
+treats the completed, proven merge as satisfied.
 
 **Generated artifacts:**
 
@@ -304,7 +308,7 @@ The primary agent:
 6. Syncs the docs.
 7. Runs `conductor-review`.
 8. Applies review fixes, re-reviews, and runs the post-review doc sync.
-9. Pushes, opens a PR, then marks the track complete.
+9. Pushes, opens a PR when enabled, then marks the track complete.
 
 If a phase is interrupted, run:
 
@@ -312,9 +316,9 @@ If a phase is interrupted, run:
 /conductor:conductor-implement recover
 ```
 
-It inspects the branch, plan, tree, checkpoint, and run file, then offers Resume,
-Restart, Reconcile, Keep Work, or Clean Stale Run State. It never runs
-`git reset --hard` or discards uncommitted work.
+It inspects the branch, plan, tree, checkpoint, and run file, then offers Verify
+Reported Work, Resume, Restart, Reconcile, Keep Work, or Clean Stale Run State.
+It never runs `git reset --hard` or discards uncommitted work.
 
 Phase evidence is committed:
 
@@ -334,8 +338,8 @@ Large binaries and screenshots go to `.conductor/evidence/`, which is gitignored
 Review is read-only at first:
 
 -   **Scope:** `base_sha..HEAD` (or a phase range).
--   **Checks:** the commands configured in `workflow.md`; no inferred "probably
-    npm test" when a command is configured.
+-   **Checks:** the commands configured in `workflow.md`; if one is missing, the
+    review infers the likely command and records that it was inferred.
 -   **Requirements:** every `FR`, `NFR`, and `AC` is traced to an implementation
     and a test or evidence artifact.
 -   **Style:** applicable style guides for changed lines, with calibrated
@@ -398,9 +402,8 @@ not been archived.
 
 Status is a factual, read-only report:
 
--   state: `new`, `legacy`, `ready`, `in_progress`, `blocked`, `in_review`,
-    `fixes`, `doc_sync`, `pr_open`, `complete`, `reverted`, `abandoned`, or
-    `drift`
+-   state: `legacy`, `ready`, `in_progress`, `blocked`, `in_review`, `fixes`,
+    `doc_sync`, `pr_open`, `complete`, `reverted`, `abandoned`, or `drift`
 -   phase and task progress
 -   current and next ready phase
 -   dependencies

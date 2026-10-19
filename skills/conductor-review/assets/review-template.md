@@ -52,6 +52,10 @@
 
 - <none>
 
+## Overrides
+
+- <none, or finding ID, approving user, date, reason, and scope>
+
 ## Plan compliance
 
 <Every planned phase and task accounted for? Any task marked complete without

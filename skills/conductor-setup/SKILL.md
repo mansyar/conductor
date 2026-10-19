@@ -56,10 +56,10 @@ Read the returned JSON object from `stdout`. **Do NOT mention the script name or
 
 - If `upgrade_required` is `true`, or the user invoked `setup upgrade`, do **not** halt. Present a compatibility report and follow Section 2.8:
     - Detected schema version, missing Workflow Config, missing Tracks section, missing `.conductor/` ignore, and agent status.
-    - Every track with legacy metadata or a non-v2 plan/spec.
-- If `setup_complete` is `true`, announce that the project is already initialized on the current version and **HALT** execution.
+    - Every track with legacy metadata or a non-v2 plan/spec as a migration warning; these do not by themselves make the environment incomplete after migration.
+- If `setup_complete` is `true`, announce that the project is already initialized on the current version. If `track_issues` is non-empty, report them as legacy-track warnings and point to `conductor/migration-report.md`, then **HALT** execution.
 - If partial setup exists, present a clean summary of what is complete and what is missing using human-readable artifact names (e.g., `tech-stack.md`). Do NOT use internal section numbers (e.g., avoid "Section 2.3").
-- Identify the pending step from `next_step` (e.g., "Technology Stack") and advise that setup can be resumed from there. If the only gaps are `tracks.md`, the Tracks section, or `.conductor/`, resume at Section 3 (Finalization).
+- Identify the pending step from `next_step` (e.g., "Technology Stack"). If it is `Conductor Subagents`, resume at Section 2.7. If the only gaps are `tracks.md`, the Tracks section, or `.conductor/`, resume at Section 3 (Finalization).
 
 ## 2. Interactive Scaffolding & Context Gathering
 
@@ -114,7 +114,10 @@ and gather context sequentially.
 Help the user define the product's vision, starting with the **Initial Concept** (Greenfield) or code analysis (Brownfield).
 
 1.  **Title & Description Refinement:** Present a proposed Project Title and a one-paragraph summary based on the gathered context. Ask the user using a **Yes/No question** if this captures their vision.
-2.  **Determine Mode:** Once the base description is approved, ask the user to choose the creation mode using a **single-choice question** with options: **Interactive** (Recommended: *the interview closes gaps that a generic draft would miss*) or **Autogenerate** (to draft a standard guide from the available context). Autogenerate drafts from context and records every unanswered checklist item as an assumption; it does not skip the checklist.
+2.  **Determine Mode:**
+    -   **Greenfield:** Once the base description is approved, ask the user to choose the creation mode using a **single-choice question** with options: **Interactive** (Recommended: *the interview closes gaps that a generic draft would miss*) or **Autogenerate** (to draft a standard guide from the available context).
+    -   **Brownfield:** Present the product draft inferred from the codebase and ask `Use inferred draft` or `Full interview` only when the user wants to restart. Do not ask the greenfield Interactive/Autogenerate question. Continue the coverage loop to close identified gaps.
+    -   Autogenerate drafts from context and records every unanswered checklist item as an assumption; it does not skip the checklist.
 
 **Coverage Checklist for `product.md`:**
 
@@ -184,7 +187,9 @@ Assumptions**.
 
 Help the user define branding, voice, tone, and UX principles.
 
-1. **Determine Mode:** Ask the user to choose a mode using a **single-choice question**: **Interactive** (Recommended: *guidelines are product-specific*) or **Autogenerate** (standard best practices).
+1. **Determine Mode:**
+   - **Greenfield:** Ask the user to choose a mode using a **single-choice question**: **Interactive** (Recommended: *guidelines are product-specific*) or **Autogenerate** (standard best practices).
+   - **Brownfield:** Present the guidelines draft inferred from the product and codebase, then run the coverage loop for gaps. Offer a full interview only if the user asks for one.
 2. **Coverage Checklist:** Adapt this list to the project type. Skip dimensions that do not apply and say why.
 
 **Coverage Checklist for `product-guidelines.md`:**
@@ -246,20 +251,21 @@ project-specific document, not a generic copy.
    could not determine. Do not ask the user to re-supply facts the repository
    already proves.
 3. **Choose Mode:** Ask the user to choose **Default** (accept the inferred
-   profile and standard policies) or **Customize** (review every field and
-   change what is needed).
+   facts and standard policies; still answer the project-specific gaps below) or
+   **Customize** (review every field and change what is needed).
 4. **Ask Only Gaps and Policies:** For either mode, ask about:
     - Coverage gate and whether it applies to new code or the whole project
     - Verification depth (which layers run per phase)
     - Commit message convention. The cadence is fixed by the phase model:
       task-level commits by the subagent and one squashed phase commit by the
       primary.
-    - Evidence location and binary artifact directory. The format is fixed:
-      one committed report per phase under `conductor/tracks/<track-id>/verification/`,
-      with large artifacts under `.conductor/evidence/`.
-    - Git base branch, whether to fetch before branching, and branch/PR policy
+    - Evidence handling. The location and format are fixed: one committed report
+      per phase under `conductor/tracks/<track-id>/verification/`, with large
+      artifacts under `.conductor/evidence/`. Do not offer to relocate them.
+    - Git base branch, whether to fetch before branching, branch push behavior,
+      and PR policy: enabled, tool (`gh`/`glab`), and base branch
     - Review policy: strict mode, whether deferred findings become GitHub issues,
-      and issue labels
+      minimum issue severity, whether Low findings are grouped, and issue labels
     - Documentation sync expectations
     - Release/deployment flow
     - Any project-specific verification steps
@@ -272,7 +278,7 @@ project-specific document, not a generic copy.
     - Layers used by the project and their exact commands
     - Services, ports, fixtures, and environment setup
     - Pass criteria and coverage gate
-    - Evidence location and format
+    - Evidence format and the fixed evidence paths
     - Fallback ladder when a layer is unavailable
     - Retry limit (default: 2 attempts)
     - Human-only exceptions (credentials, hardware, external approvals)

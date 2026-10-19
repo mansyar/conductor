@@ -31,9 +31,9 @@ branches.
     `conductor/index.md` or the default path. HALT only if it is missing. If it
     is empty, report that there are no tracks and suggest
     `conductor-new-track`.
-3.  **Load the Workflow Config:** Read `git.base_branch` and `pr.tool` from
-    `conductor/workflow.md`. If the workflow is missing, use `main` and add a
-    warning.
+3.  **Load the Workflow Config:** Read `git.base_branch`, `pr.enabled`, and
+    `pr.tool` from `conductor/workflow.md`. If the workflow is missing, use
+    `main`, assume PRs are enabled, and add a warning.
 4.  **Do Not Halt for Context Docs:** Missing `product.md`, `tech-stack.md`, or
     `product-guidelines.md` produces a warning, not a halt. Status is a
     read-only report.
@@ -135,8 +135,8 @@ Include a concrete `Fix:` line for every warning or error.
     `.opencode/skills/`, confirm the directory exists. If `.opencode/` does not
     exist, report that the project is not using OpenCode subagents and continue.
 8.  **Tooling:** `git` is available; `python` or `python3` is available when
-    setup scripts are used; when a remote and PR flow are enabled, `gh` is
-    installed and `gh auth status` succeeds.
+    setup scripts are used; when a remote and PR flow are enabled, the
+    configured `pr.tool` (`gh` or `glab`) is installed and authenticated.
 9.  **Runtime state:** `.conductor/runs/*.json` points to an existing branch and
     phase; a recorded checkpoint, when present, exists; completed and archived
     tracks have no `status: running` run file. Stale run files are warnings, not
@@ -157,21 +157,23 @@ Next: repair the errors, then re-run conductor-status --doctor
 For each track in the current report that has a `pr_url`, and each
 `reverted`/`[-]` track that has a `revert_pr_url`:
 
-1.  Run:
+1.  Use the configured `pr.tool` (default `gh`). For `gh`:
     ```bash
     gh pr view <url> --json state,mergeable,reviewDecision,statusCheckRollup,url
     ```
-2.  Optionally run `gh pr checks <url>` for human-readable check names.
+    For `glab`, use the equivalent merge-request view command.
+2.  Optionally run the tool's check listing (`gh pr checks <url>` for GitHub) for
+    human-readable check names.
 3.  Treat `statusCheckRollup` as:
     -   any `FAILURE` / `CANCELLED` / `TIMED_OUT` → checks failing
     -   any `PENDING` / `IN_PROGRESS` / `QUEUED` → checks pending
     -   otherwise → checks passing or none
 4.  Query at most 10 PRs. Prioritize active and selected tracks. If more remain,
     list them as `not queried` and suggest `status --pr <track>`.
-5.  If `gh` is missing, unauthenticated, or the network fails, keep the local
+5.  If the configured tool is missing, unauthenticated, or the network fails, keep the local
     `pr_state` and add a warning. Do not block the status report.
 6.  Do not poll, wait, rerun checks, or mutate the PR.
-7.  If `gh` reports `MERGED` but metadata still says `open`, show the track as
+7.  If the configured tool reports `MERGED` but metadata still says `open`, show the track as
     merged and use "Run conductor-implement cleanup" as the next action. If
     `gh` reports `CLOSED` without merge, show drift. Do not rewrite metadata
     from a read-only status command.
@@ -209,7 +211,6 @@ States are factual, not schedule-based.
 
 | State | Meaning |
 | --- | --- |
-| `new` | Registered, not started, no branch activity. |
 | `legacy` | Pre-v2 track migrated from Conductor 1.x; not executable until recreated or repaired. |
 | `ready` | Not started, dependencies met. |
 | `in_progress` | At least one implementation phase is active or pending. |
@@ -218,7 +219,7 @@ States are factual, not schedule-based.
 | `fixes` | Review is `BLOCK`, a review-fix phase is pending, or review is `SUPERSEDED`. |
 | `doc_sync` | Review passed; post-review documentation sync is pending. |
 | `pr_open` | Complete, PR open, awaiting review/merge. |
-| `complete` | Complete and merged, or complete with no remote/PR. A closed unmerged PR is not complete. |
+| `complete` | Complete and merged, complete with no remote, `pr.enabled: false`, or PR creation recorded as unavailable. A closed unmerged PR is not complete. |
 | `reverted` | Track was reverted after merge; registry marker `[-]`. |
 | `abandoned` | Track was abandoned before merge; registry marker `[-]` or entry removed. |
 | `drift` | Registry, metadata, plan, and git state disagree. Show the conflict; do not guess. |
@@ -228,7 +229,10 @@ Derivation order:
 1.  `[-]` or metadata `reverted`/`abandoned` → terminal state.
 2.  Metadata `legacy: true` → `legacy`.
 3.  Metadata or plan says `blocked` → `blocked`.
-4.  Unmet `depends_on` → `blocked`.
+4.  Unmet `depends_on` → `blocked`. Resolve each dependency in `tracks.md`; if
+    it is absent there, read `conductor/archive/<track-id>/metadata.json`.
+    Archived complete dependencies with proven merges are satisfied; `legacy`,
+    `reverted`, and `abandoned` dependencies are not.
 5.  Review verdict `BLOCK` or `SUPERSEDED`, or a pending `Phase R` → `fixes`.
 6.  All implementation phases verified:
     -   no review verdict → `in_review`
@@ -238,8 +242,10 @@ Derivation order:
         -   `pr_state: "closed"` and the branch is not merged → `drift`
         -   `pr_state: "closed"` and the branch is merged → `complete` (warn:
             PR closed but the branch is merged)
-        -   `pr_state: "merged"` or no PR/remote → `complete`
-        -   `pr_state: null` with a remote → `complete` (next action: open PR)
+        -   `pr_state: "merged"`, `pr_state: "unavailable"`, no remote, or
+            `pr.enabled: false` → `complete`
+        -   `pr_state: null` with a remote and `pr.enabled: true` → `drift`
+            (PR state missing; next action: open PR)
 7.  `[~]` or metadata `in_progress` → `in_progress`.
 8.  `[ ]` with no started phases → `ready` if dependencies are met, otherwise
     `blocked`.
@@ -257,7 +263,7 @@ model.
 
 Derive one concrete next action per track:
 
--   `new` / `ready` → "Implement Phase 1" (or the first ready phase).
+-   `ready` → "Implement Phase 1" (or the first ready phase).
 -   `legacy` → "Recreate with conductor-new-track or repair the spec/plan".
 -   `in_progress` → "Implement Phase N".
 -   `blocked` → "Resolve blocker: <dependency/blocker>".
@@ -271,16 +277,18 @@ Derive one concrete next action per track:
     -   checks pending → "Wait for checks".
     -   otherwise → "Await review/merge".
 -   `complete`:
+    -   `pr_state: "unavailable"` → "Open the PR manually".
     -   not archived, branch exists, and merge is proven → "Run
         conductor-implement cleanup".
     -   otherwise → "None".
+-   `reverted` with `pr_state: "unavailable"` → "Open the revert PR manually".
 -   `reverted` with `pr_state: "merged"` and no `archived_at` → "Run
     conductor-implement cleanup".
 -   `reverted` with `revert_pr_url` or `pr_state: "open"` → "Review and merge
     revert PR".
 -   `reverted` / `abandoned` otherwise → "None".
 -   `drift` with a closed unmerged PR → "Reopen the PR or reopen the track".
--   If complete and a remote exists but `pr_url` is null → "Push and open PR".
+-   `drift` with a remote, `pr.enabled: true`, and no PR state → "Open PR".
 -   If a track is `[x]` but its branch is not merged → "Drift: branch not
     merged".
 
@@ -309,7 +317,8 @@ Report every mismatch; never hide or auto-fix it:
 -   An archived track with a live local branch.
 -   Duplicate track IDs or duplicate registry entries.
 -   Empty or unparsable plan for an active track.
--   PR state mismatch when `gh` confirms a different state.
+-   PR state mismatch when the configured PR tool confirms a different state.
+-   Complete with a remote and `pr.enabled: true` but `pr_state: null`.
 -   `updated_at` older than 14 days on an active or review track (stale, not
     "behind schedule").
 

@@ -237,7 +237,8 @@ track review is preserved.
 -   Out of scope.
 -   Debt: accepted/deferred findings with reasons and issue links.
 -   History: round, verdict, counts, fixed.
--   Doc sync: `updated` or `none` (filled after the post-review sync).
+-   Doc sync: `pending` at review time; the post-review sync changes it to
+    `updated` or `none`.
 
 For a normal track review, update `metadata.json`:
 
@@ -300,8 +301,8 @@ For a normal track review, if there are fixable findings:
     - [ ] **R<n>.T1: Resolve <finding ID>** — covers: <finding ID>
     ```
 
-2.  Commit the plan addition:
-    `conductor(plan): Add review fixes phase for track '<track-id>'`.
+2.  Commit the plan addition and the `metadata.json` change together:
+    `conductor(review): Add review fixes phase for track '<track-id>'`.
 3.  Execute Phase R<n> using the `conductor-implement` Phase Execution Loop.
 4.  The fixer must fix the root cause and add or update tests. It must not apply
     a diff blindly or make opportunistic changes.
@@ -331,9 +332,15 @@ in one batch, after the user confirms.
 
 ### 8.1 When to Create Issues
 
+First apply `review.issues.min_severity`: `low` includes all findings, `medium`
+excludes Low, and `high` includes only Critical/High. Findings below the
+threshold are still recorded in `review.md` Debt with the reason they were not
+filed; never drop them silently.
+
 -   Medium finding that cannot be fixed in the phase: one issue per finding.
--   Low findings that are subjective or outside the fix phase: grouped by area
-    into one issue per track/area.
+-   Low findings that are subjective or outside the fix phase: if
+    `review.issues.group_low` is true, group them by area into one issue per
+    track/area; otherwise create one issue per finding.
 -   Out-of-scope discovery: one issue.
 -   Critical/High that could not be resolved: one issue, plus the override
     recorded in `review.md`.
@@ -358,9 +365,9 @@ If `review.issues.enabled` is false, record everything in `review.md` Debt.
     `gh issue list --search "<finding>"`. If an open issue already covers it,
     link/comment instead of duplicating.
 -   Create at most 10 issues per batch.
--   Use labels that already exist: `tech-debt`, `conductor`,
-    `severity:<level>`. Add an area label only when the repository already uses
-    one. Do not create new labels silently.
+-   Use `review.issues.labels` from the Workflow Config, plus
+    `severity:<level>` when that label already exists. Add an area label only
+    when the repository already uses one. Do not create new labels silently.
 -   Title: `[conductor] <severity>: <short finding>`.
 -   Body:
 
@@ -419,8 +426,12 @@ When review is done:
 -   **PASS / PASS WITH FINDINGS on a `revert/<track-id>` branch:** return
     control to `conductor-revert` to finish the revert PR.
 -   **BLOCK after the round cap:** stop and ask the user how to proceed. Do not
-    mark the track complete or open a PR. If the user explicitly overrides a
-    blocking finding, record the override in `review.md` and return to
+    mark the track complete or open a PR. If the user explicitly overrides every
+    remaining blocking finding, record each in the `## Overrides` section of
+    `review.md` with the finding ID, approving user, date, reason, and scope,
+    change the header verdict to `PASS WITH FINDINGS (override)`, set
+    `metadata.review_verdict` to `PASS WITH FINDINGS` (or `PASS`), commit
+    `conductor(review): Record override for track '<track-id>'`, then return to
     `conductor-implement`; this is the only path that proceeds with a known
     Critical/High.
 -   **Fundamental design problem:** offer the `conductor-revert` skill for the

@@ -53,6 +53,14 @@ def _has_runtime_ignore():
     )
 
 
+def _is_opencode_project():
+    return bool(
+        os.path.isdir(".opencode")
+        or os.path.isfile("opencode.json")
+        or os.path.isfile("opencode.jsonc")
+    )
+
+
 def _track_issues():
     """Returns legacy or incomplete v2 tracks found under conductor/tracks/."""
     tracks_dir = os.path.join(CONDUCTOR_DIR, "tracks")
@@ -103,6 +111,7 @@ def determine_resumption():
         "## Tracks" in index_text and "tracks.md" in index_text
     )
     has_runtime_ignore = _has_runtime_ignore()
+    opencode_detected = _is_opencode_project()
     agents_installed = all(
         os.path.exists(path)
         for path in (
@@ -119,7 +128,7 @@ def determine_resumption():
         (checklist["index.md"] and schema_version != SCHEMA_VERSION)
         or (checklist["workflow.md"] and not has_workflow_config)
     )
-    upgrade_required = bool(legacy or track_issues)
+    upgrade_required = bool(legacy)
 
     setup_complete = bool(
         all(checklist.values())
@@ -127,7 +136,7 @@ def determine_resumption():
         and has_workflow_config
         and has_tracks_section
         and has_runtime_ignore
-        and not track_issues
+        and (not opencode_detected or agents_installed)
     )
 
     next_step = None
@@ -135,6 +144,11 @@ def determine_resumption():
         next_step = {
             "step": "Upgrade Legacy Conductor",
             "file": "conductor/index.md",
+        }
+    elif opencode_detected and not agents_installed:
+        next_step = {
+            "step": "Conductor Subagents",
+            "file": ".opencode/agents/conductor-phase.md",
         }
     elif not setup_complete:
         chain = [
@@ -164,6 +178,7 @@ def determine_resumption():
             "workflow_config": has_workflow_config,
             "tracks_section": has_tracks_section,
             "runtime_ignore": has_runtime_ignore,
+            "opencode_detected": opencode_detected,
             "agents_installed": agents_installed,
             "track_issues": track_issues,
         },

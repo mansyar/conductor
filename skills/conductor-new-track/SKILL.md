@@ -42,8 +42,8 @@ Before starting the planning process, you MUST locate and read the project's fou
 
 3.  **Read the Workflow Config:** Locate the `## Workflow Config` YAML block in
     `conductor/workflow.md`. You will need its `git.base_branch`,
-    `verification.layers`, and command values when generating the plan and
-    creating the branch. If the block is missing, use sensible defaults and tell
+    `git.fetch`, `verification.layers`, and command values when generating the
+    plan and creating the branch. If the block is missing, use sensible defaults and tell
     the user the workflow should be regenerated. If `conductor/index.md` also
     lacks `<!-- conductor-version: 2 -->`, recommend running
     `conductor-setup upgrade` before creating new v2 tracks.
@@ -212,9 +212,10 @@ nothing behind.
 2.  **Resolve the Base Branch:**
     -   Read `git.base_branch` from the Workflow Config, if present.
     -   Determine whether a remote exists (`git remote`).
-    -   **With a remote:** run `git fetch origin`. Try, in order:
-        `origin/<configured-base>`, `origin/main`, `origin/master`, `main`,
-        `master`.
+    -   **With a remote:** if `git.fetch` is true, run `git fetch origin`. If
+        it is false, use the local refs and warn that the base may be stale.
+        Try, in order: `origin/<configured-base>`, `origin/main`,
+        `origin/master`, `main`, `master`.
     -   **Without a remote:** try `main`, then `master`.
     -   If none exists, HALT and ask the user which branch to use.
     -   Record `base_branch` as the branch name without the remote prefix (for
@@ -256,8 +257,12 @@ nothing behind.
       `conductor/tracks/<track-id>/metadata.json` with:
         -   `id`, `title`, `type`, `status: "new"`, `priority`
         -   `depends_on` from the spec's track dependencies. If it is non-empty,
-            verify each dependency is `[x]` and merged into the base; otherwise
-            warn that this track cannot start until the dependency lands.
+            resolve each dependency in `tracks.md`; if it is absent there, read
+            `conductor/archive/<track-id>/metadata.json`. A dependency is
+            satisfied only when it is complete and its merge is proven
+            (`pr_state: "merged"`, `merged_at`, `merge_commit`, or an ancestor
+            check). Otherwise warn that this track cannot start until the
+            dependency lands.
         -   `created_at` and `updated_at` (ISO-8601)
         -   `spec: "spec.md"`, `plan: "plan.md"`
         -   `branch`, `base_branch`, `base_sha`

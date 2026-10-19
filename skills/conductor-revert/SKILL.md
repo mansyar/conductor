@@ -86,9 +86,10 @@ tree.
     -   If the branch exists, `git merge-base --is-ancestor <branch> <base>`.
     -   If the branch was deleted, use `pr_state` and `git log <base>` for the
       merge or squash commit.
--   `pr_state`: read metadata. If `gh` is available and `pr_url` exists, use
-    `gh pr view <url> --json state,mergeCommit` to confirm. Do not block on a
-    network or auth failure; report that the local state is being used.
+-   `pr_state`: read metadata. If the configured `pr.tool` is available and
+    `pr_url` exists, use its PR/MR view command (`gh pr view <url> --json
+    state,mergeCommit` for GitHub) to confirm. Do not block on a network or auth
+    failure; report that the local state is being used.
 
 ### 3.3 Phase Revert Preflight
 
@@ -126,15 +127,16 @@ tree.
 -   **Unmerged:** confirm the branch is not merged. If a PR is open, confirm
     whether to close it.
 -   **Merged:** find the merge or squash commit:
-    1.  `gh pr view <pr_url> --json mergeCommit` when available.
+    1.  Query the configured `pr.tool` for the merge commit (`gh pr view
+        <pr_url> --json mergeCommit` for GitHub) when available.
     2.  `git log --oneline --merges --grep "<track-id>" <base>`.
     3.  `git log --oneline <base> --grep "<track title>"`.
     4.  Ask the user to confirm the commit. Do not revert an ambiguous commit.
 -   If the commit is a merge, plan `git revert -m 1 <sha>`. If it is a squash,
     plan `git revert <sha>`. If the PR was rebased or fast-forwarded, there is no
-    single merge commit; plan the PR's commits newest first (from
-    `gh pr view <pr_url> --json commits` or `git log <base> --grep
-    "<track-id>"`) and pass them to `git revert -n`.
+    single merge commit; plan the PR's commits newest first (from the configured
+    tool's commit list or `git log <base> --grep "<track-id>"`) and pass them to
+    `git revert -n`.
 
 ---
 
@@ -288,14 +290,19 @@ Use branch deletion, not `git revert`.
 
 Use a reviewed revert PR.
 
-1.  Fetch the base branch.
+0.  Read `pr.enabled`. If it is false, stop and explain that a merged-track
+    revert requires a reviewed PR; the user must enable PRs or revert manually.
+    Verify `pr.tool` is available and authenticated before creating the branch.
+    If it is not, stop before changing any state.
+1.  If `git.fetch` is true, fetch the base branch. If it is false, use the local
+    base and warn that it may be stale.
 2.  Create `revert/<track-id>` from the base.
 3.  Revert the merged work without committing yet:
     -   Merge: `git revert -n -m 1 <sha>`.
     -   Squash: `git revert -n <sha>`.
-    -   Rebase or fast-forward: list the track's commits newest first (from
-        `gh pr view <pr_url> --json commits` or `git log <base> --grep
-        "<track-id>"`) and pass them to `git revert -n` in that order.
+    -   Rebase or fast-forward: list the track's commits newest first (from the
+        configured tool's commit list or `git log <base> --grep "<track-id>"`)
+        and pass them to `git revert -n` in that order.
     -   On conflict, stop and offer abort or manual resolution.
 4.  Preserve the Conductor artifacts that the revert removed. Restore them from
     the base branch as it was before the revert:
@@ -338,15 +345,20 @@ Use a reviewed revert PR.
     `conductor/tracks/<track-id>/revert-pr.md` from
     `assets/revert-pr-template.md`, then stage and commit it:
     `conductor(revert): Add revert PR body for track '<track-id>'`.
-11. Push and create the PR:
+11. Push and create the PR with `pr.tool` (default `gh`) and
+    `pr.base or base_branch`:
     ```bash
     git push -u origin revert/<track-id>
     gh pr create \
-      --base <base_branch> \
+      --base <pr.base or base_branch> \
       --head revert/<track-id> \
       --title "revert(<scope>): <track title>" \
       --body-file conductor/tracks/<track-id>/revert-pr.md
     ```
+    For `glab`, use the equivalent merge-request command. If PR creation fails,
+    stop and leave the revert branch for inspection. Set `pr_state:
+    "unavailable"` in a metadata-only commit, leave `revert_pr_url` null, and
+    report that the revert PR must be opened manually.
 12. Record `revert_pr_url` and `pr_state: "open"` in metadata, commit
     `conductor(revert): Record revert PR for track '<track-id>'`, and push. This
     is metadata-only and does not require re-review.
