@@ -342,9 +342,16 @@ Conductor ships two project-local subagent profiles:
 
     ```yaml
     - action: shell
+      resource: "<command>"
+      effect: allow
+    - action: shell
       resource: "<command> *"
       effect: allow
     ```
+
+    Emit **both** rules per command. OpenCode matches the bare command and the
+    command-with-arguments against separate patterns; `<command> *` alone does
+    not match an invocation without arguments.
 
     - `conductor-phase` gets every command the phase needs: setup, test,
       coverage, lint, format, typecheck, build, and `verify_phase`.
