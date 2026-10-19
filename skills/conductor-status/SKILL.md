@@ -44,7 +44,8 @@ branches.
 
 -   **Default:** the current branch and its registry.
 -   `status <track-id-or-title>`: full detail for one track, including a plan
-    read.
+    read. If the ID is not in the registry but exists under
+    `conductor/archive/`, report archived detail instead of "not found".
 -   `status --all`: scan local track branches read-only, including branches
     whose registry is not visible on the current branch.
 -   `status --verify`: recompute progress from every plan instead of trusting the
@@ -63,7 +64,9 @@ it reports problems and exact repair commands for the user to approve.
 
 ### 3.1 Default Report
 
-1.  Parse `conductor/tracks.md` for `[ ]`, `[~]`, `[x]`, and `[-]` entries.
+1.  Parse `conductor/tracks.md` for `[ ]`, `[~]`, `[x]`, and `[-]` entries. If
+    the requested track ID is absent, check
+    `conductor/archive/<track-id>/metadata.json` for an archived track.
 2.  Read every track's `metadata.json`.
 3.  Read the plan for every **active** track (`[~]` or metadata
     `in_progress`), and for any track in `fixes` or `doc_sync`.
@@ -75,7 +78,9 @@ it reports problems and exact repair commands for the user to approve.
     warning. Never invent a value.
 7.  List `conductor/archive/` directory names (names only) to report the count
     and the last three archived tracks.
-8.  Read the current branch, base, ahead/behind, and tree state.
+8.  Read the current branch, base, ahead/behind, and tree state. For completed
+    tracks, check whether `metadata.branch` still exists and whether it is an
+    ancestor of the base, so the cleanup next action is factual.
 9.  For the active track, read `.conductor/runs/<track-id>.json` when it exists.
     Report the phase, status, session ID presence, and `updated_at`. Do not claim
     a subagent is live just because a run file says `running`.
@@ -94,7 +99,9 @@ it reports problems and exact repair commands for the user to approve.
     ```
 3.  Read the branch's `conductor/tracks.md` when present to get the registry
     marker.
-4.  Mark each branch merged or unmerged against the base.
+4.  Mark each branch merged or unmerged using a merged `pr_state`/revert PR
+    state when available, otherwise `git merge-base --is-ancestor`. For a
+    squash or rebase merge without PR proof, show `unknown`; do not guess.
 5.  Do not read every plan in `--all` mode; use metadata and show a note that
     only active/selected tracks are plan-verified.
 
@@ -119,7 +126,8 @@ Include a concrete `Fix:` line for every warning or error.
 6.  **Tracks:** every registry entry resolves; metadata is valid JSON with the
     required fields; plans parse into phases and tasks; verified phases have a
     `Checkpoint` and `Evidence`; legacy tracks are listed; `review_verdict` and
-    `doc_sync` agree with `review.md`.
+    `doc_sync` agree with `review.md`; `archived_at` and `archive_path` agree
+    with the archive directory and registry state.
 7.  **OpenCode:** If `.opencode/`, `opencode.json`, or `opencode.jsonc` exists,
     confirm `.opencode/agents/conductor-phase.md` and `conductor-reviewer.md` exist;
     neither contains a `PROJECT COMMANDS` or `PROJECT CHECKS` marker; each has at
@@ -130,11 +138,12 @@ Include a concrete `Fix:` line for every warning or error.
     setup scripts are used; when a remote and PR flow are enabled, `gh` is
     installed and `gh auth status` succeeds.
 9.  **Runtime state:** `.conductor/runs/*.json` points to an existing branch and
-    phase; a recorded checkpoint, when present, exists; completed tracks have no
-    `status: running` run file. Stale run files are warnings, not errors.
-10. **PR consistency:** when `pr_url` exists, do not fetch it here unless
-    `--pr` is also set. Report that `status --pr` is available. If `pr_state` is
-    `closed` and the branch is not merged, mark it an error.
+    phase; a recorded checkpoint, when present, exists; completed and archived
+    tracks have no `status: running` run file. Stale run files are warnings, not
+    errors.
+10. **PR consistency:** when `pr_url` or `revert_pr_url` exists, do not fetch it
+    here unless `--pr` is also set. Report that `status --pr` is available. If
+    `pr_state` is `closed` and the branch is not merged, mark it an error.
 
 Doctor output is a checklist, not a status table. End with:
 
@@ -145,7 +154,8 @@ Next: repair the errors, then re-run conductor-status --doctor
 
 ### 3.4 `status --pr`
 
-For each track in the current report that has a `pr_url`:
+For each track in the current report that has a `pr_url`, and each
+`reverted`/`[-]` track that has a `revert_pr_url`:
 
 1.  Run:
     ```bash
@@ -161,6 +171,10 @@ For each track in the current report that has a `pr_url`:
 5.  If `gh` is missing, unauthenticated, or the network fails, keep the local
     `pr_state` and add a warning. Do not block the status report.
 6.  Do not poll, wait, rerun checks, or mutate the PR.
+7.  If `gh` reports `MERGED` but metadata still says `open`, show the track as
+    merged and use "Run conductor-implement cleanup" as the next action. If
+    `gh` reports `CLOSED` without merge, show drift. Do not rewrite metadata
+    from a read-only status command.
 
 ---
 
@@ -231,6 +245,9 @@ Derivation order:
     `blocked`.
 9.  Contradictions → `drift`, with a warning listing the conflicting values.
 
+Archive is storage, not a workflow state. `archived_at` does not change the
+state; an archived track remains `complete` or `reverted`.
+
 Do not output "On Track" or "Behind Schedule". There is no schedule in the
 model.
 
@@ -253,7 +270,12 @@ Derive one concrete next action per track:
     -   merge conflict → "Resolve merge conflicts".
     -   checks pending → "Wait for checks".
     -   otherwise → "Await review/merge".
--   `complete` → "None".
+-   `complete`:
+    -   not archived, branch exists, and merge is proven → "Run
+        conductor-implement cleanup".
+    -   otherwise → "None".
+-   `reverted` with `pr_state: "merged"` and no `archived_at` → "Run
+    conductor-implement cleanup".
 -   `reverted` with `revert_pr_url` or `pr_state: "open"` → "Review and merge
     revert PR".
 -   `reverted` / `abandoned` otherwise → "None".
@@ -281,6 +303,10 @@ Report every mismatch; never hide or auto-fix it:
 -   Dirty working tree.
 -   Local track branches not present in the current branch's registry.
 -   `[-]` track with a live track branch.
+-   An archived track that still appears in `tracks.md` or
+    `conductor/tracks/`.
+-   `metadata.archived_at` without a matching `archive_path`, or the reverse.
+-   An archived track with a live local branch.
 -   Duplicate track IDs or duplicate registry entries.
 -   Empty or unparsable plan for an active track.
 -   PR state mismatch when `gh` confirms a different state.
@@ -321,7 +347,8 @@ Mode details:
 
 -   **Default:** summary table + active track detail + warnings + archive count.
 -   **`status <track>`:** full phase table, task counts, checkpoints, evidence
-    links, run state, review findings summary, PR/CI state, and warnings.
+    links, run state, review findings summary, PR/CI state, archive path/date
+    when archived, and warnings.
 -   **`--all`:** add a branch table:
     `Branch | Track | State | Progress | Merged? | PR`.
 -   **`--verify`:** note that all plans were recomputed.
@@ -338,10 +365,11 @@ an empty progress report.
 
 ## 9. PR and CI Information
 
--   **Default report:** if `pr_url` exists and `gh` is available, query only the
-    active or selected track. Never query every PR by default.
--   **`--pr`:** query every track in the current report with a `pr_url`, subject
-    to the 10-PR cap in Section 3.4.
+-   **Default report:** if `pr_url` or `revert_pr_url` exists and `gh` is
+    available, query only the active or selected track. Never query every PR by
+    default.
+-   **`--pr`:** query every track in the current report with a `pr_url` or
+    `revert_pr_url`, subject to the 10-PR cap in Section 3.4.
 -   If `gh` is missing, unauthenticated, or the network fails, show the local
     `pr_state` and add a note. Do not block the report.
 -   Use `statusCheckRollup` for the check summary; do not paste raw JSON.
@@ -355,6 +383,7 @@ an empty progress report.
 -   Never fabricate blockers or health labels.
 -   Never read every plan in the default report.
 -   Never treat `[-]` as pending or complete.
+-   Never treat an archived track as active.
 -   Never hide a registry/metadata/plan contradiction.
 -   Never scan remote branches unless the user explicitly asks.
 -   `--doctor` reports fixes but never applies them.

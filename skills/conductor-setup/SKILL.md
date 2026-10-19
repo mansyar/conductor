@@ -411,8 +411,9 @@ without changing anything.
     - `last_checkpoint: null`
     - `review_verdict: null`, `review_rounds: 0`
     - `doc_sync: "pending"`
-    - `pr_url: null`, `pr_state: null`
+    - `pr_url: null`, `pr_state: null`, `merged_at: null`, `merge_commit: null`
     - `reverted_at: null`, `revert_commit: null`, `revert_pr_url: null`
+    - `archived_at: null`, `archive_path: null`
     - `legacy: true`, `migrated_at: "<ISO timestamp>"`, `migrated_from: "1.x"`
 
    Mark every track whose metadata was incomplete or whose `spec.md`/`plan.md`

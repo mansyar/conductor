@@ -589,34 +589,99 @@ uncommitted work without explicit confirmation.
 
 ### 9.3 `implement cleanup`
 
-1.  List local track and revert branches matching `feat/*`, `fix/*`, `chore/*`,
-    `refactor/*`, `revert/*` and worktrees under `.conductor/worktrees/`.
-    Include branches for `[-]` tracks; they are cleanup candidates only when the
-    revert PR is merged.
-2.  Mark each branch merged or unmerged against the configured base.
-3.  Delete only merged branches, and only after confirmation. If a branch is
-    current, check out the base first.
-4.  Remove worktrees whose branch is merged and whose directory is clean.
-5.  Never delete an unmerged branch or a dirty worktree. Show it to the user.
+Cleanup is track-independent. Do not select a track. It removes merged branches
+and archives merged tracks in one flow.
 
-### 9.4 Post-Merge Archive
+1.  **Preflight:** Run from the configured base branch with a clean tree.
+    -   `git status --porcelain`, ignoring `.conductor/`. If anything else is
+        dirty, stop and ask the user to commit or stash it.
+    -   If the current branch is a track or revert branch and the tree is clean,
+        offer to check out the base branch first. Otherwise stop.
+    -   Fetch the base when a remote exists and `git.fetch` is true.
 
-Run this only on the base branch. Do not archive from a track branch; ask the
-user to switch first.
+2.  **Refresh PR state:** For every `[x]` track with `pr_url` and every `[-]`
+    track with `revert_pr_url`, query the PR when `gh` is available:
 
-1.  Find `[x]` tracks whose branch is merged, and `[-]` tracks whose revert PR is
-    merged.
-2.  For each candidate, offer **Archive (Recommended)** or **Skip**.
-3.  On Archive:
-    -   Move `conductor/tracks/<track-id>/` to
-        `conductor/archive/<track-id>/`.
+    ```bash
+    gh pr view <url> --json state,mergeCommit,headRefOid,mergedAt,url
+    ```
+
+    Keep the result in memory. Do not write metadata until the user confirms
+    cleanup. If `gh` is missing or unauthenticated, mark the state unknown and
+    use local proof only.
+
+3.  **Prove the merge before deleting anything:**
+    -   **PR merged:** `state: "MERGED"`. Compare `headRefOid` with the local
+        branch tip.
+    -   **Local merge or fast-forward:** the branch has no PR, but
+        `git merge-base --is-ancestor <branch> <base>` succeeds.
+    -   **Squash or rebase with no PR proof:** do not guess. Show
+        `git log <base> --grep "<track-id>"` and ask the user to confirm. Never
+        delete or archive on a guess.
+
+    If the branch tip differs from the PR head, the branch advanced after the
+    PR. Warn and leave it alone; do not archive it as fully merged.
+
+4.  **Present the candidates:** one table with track ID, branch, PR, merge proof,
+    archive state, and whether a remote branch exists. Candidate branches are
+    `metadata.branch` for `[x]` tracks and `revert/<track-id>` for `[-]` tracks.
+    Show other prefix branches separately; never delete them without an explicit
+    per-branch confirmation. Ask for confirmation separately for:
+    -   Deleting local branches.
+    -   Deleting remote branches, when the remote branch still exists.
+    -   Archiving tracks.
+
+    Allow **All**, **Select**, and **Skip** for each.
+
+5.  **Delete local branches:**
+    -   `git branch -d <branch>` when the branch is an ancestor of the base.
+    -   `git branch -D <branch>` only with PR-merged proof and explicit
+        confirmation.
+    -   If the current branch is the candidate, check out the base first.
+    -   Never delete an unmerged branch, a branch with commits newer than the PR
+        head, or a branch belonging to a dirty worktree.
+
+6.  **Delete remote branches:** Check `git ls-remote --heads origin <branch>`.
+    If it still exists and the user confirmed, run
+    `git push origin --delete <branch>`. Do not delete a remote branch whose PR
+    is not merged.
+
+7.  **Remove worktrees:** For each `.conductor/worktrees/` entry whose branch is
+    merged and whose directory is clean, offer to remove it with
+    `git worktree remove <path>`. Never use `--force` or remove a dirty
+    worktree.
+
+8.  **Archive merged tracks:** For each confirmed `[x]` track whose branch is
+    merged, or `[-]` track whose revert PR is merged:
+    -   Require a clean tree and the base branch.
+    -   Stop if `conductor/tracks/<track-id>/` is missing or
+        `conductor/archive/<track-id>/` already exists. Do not overwrite either
+        path.
+    -   `git mv conductor/tracks/<track-id>/ conductor/archive/<track-id>/`.
     -   Remove the track's line from `conductor/tracks.md`.
-    -   Keep `metadata.json`, `review.md`, `pr.md`, and verification records in
-        the archive.
-    -   Commit `chore(conductor): Archive track '<track-id>'`.
-4.  Never archive a track whose branch or revert PR is unmerged.
-5.  Permanent deletion is never automatic. Require an explicit, separate
-    confirmation and never delete an unmerged or unreviewed track.
+    -   Update `metadata.json`:
+        -   Keep `status: "complete"` or `"reverted"`. Archive is storage, not a
+            workflow state.
+        -   Set `archived_at`, `archive_path` to
+            `conductor/archive/<track-id>`, and `updated_at`.
+        -   When a PR proved the merge:
+            -   For a `[x]` track, set `pr_state: "merged"`, `merged_at`, and
+                `merge_commit` from the original PR.
+            -   For a `[-]` track, set `pr_state: "merged"` from the revert PR;
+                leave the original `merged_at` and `merge_commit` unchanged.
+    -   Remove `.conductor/runs/<track-id>.json` if it exists.
+    -   Keep `metadata.json`, `review.md`, `pr.md`, `revert-pr.md`, and
+        verification records in the archive.
+    -   Stage the archive directory, `conductor/tracks.md`, and `metadata.json`.
+        Commit one track at a time:
+        `chore(conductor): Archive track '<track-id>'`.
+
+9.  **No purge:** Never permanently delete an archived track. There is no
+    automatic retention or purge step. A user who wants deletion must do it
+    manually with a separate explicit confirmation.
+
+10. Report deleted branches, removed worktrees, archived tracks, skipped
+    candidates, and any branch whose merge could not be proven.
 
 ---
 
@@ -630,6 +695,9 @@ user to switch first.
 -   Do not mark it complete before the PR exists when a remote and `pr.enabled`
     are configured, unless PR creation is unavailable.
 -   Do not push or open a PR before review and post-review doc sync.
+-   Do not delete a branch or archive a track without proven merge.
+-   Do not use `git branch -D` without PR-merged proof and confirmation.
+-   Do not permanently delete an archived track or purge history.
 -   Do not stage unrelated files.
 -   Do not rewrite shared history with `git reset --hard`, `git clean`, or
     force-push.

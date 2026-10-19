@@ -36,7 +36,9 @@ tracks.
     and `pr.tool` from `conductor/workflow.md`. If the workflow is missing, use
     `main` and note the fallback.
 4.  **Read the Track:** For the selected track, read `metadata.json`, `plan.md`,
-    `spec.md`, and `review.md` when present.
+    `spec.md`, and `review.md` when present. Resolve `conductor/tracks/<track-id>`
+    first; if the user explicitly names an archived track, resolve
+    `conductor/archive/<track-id>` instead.
 
 ---
 
@@ -55,7 +57,8 @@ tracks.
 
 ### 2.2 Selection
 
-1.  If a target is provided, resolve it in the registry and plan.
+1.  If a target is provided, resolve it in the registry and plan. If it is not
+    in the registry, look for `conductor/archive/<track-id>/`.
 2.  Otherwise:
     -   Prefer tracks marked `[~]`.
     -   List the up to three most relevant in-progress or verified phases.
@@ -93,6 +96,8 @@ tree.
     Conductor 1.x track because it has no v2 phase checkpoints. Offer
     `conductor-new-track` to recreate the work, or a whole-track revert if the
     code is merged and the user only wants it removed.
+    If the track is archived, stop. Phase revert requires an unmerged track; use
+    `revert track` for an archived, merged track.
 
 1.  The current branch must equal `metadata.branch`. Check it out if the tree is
     clean.
@@ -294,15 +299,28 @@ Use a reviewed revert PR.
     -   On conflict, stop and offer abort or manual resolution.
 4.  Preserve the Conductor artifacts that the revert removed. Restore them from
     the base branch as it was before the revert:
-    ```bash
-    git checkout origin/<base_branch> -- conductor/tracks/<track-id> conductor/tracks.md
-    # use <base_branch> instead when there is no remote
-    ```
-    Restore only paths that existed and were removed. Then update the track on
-    the revert branch:
-    -   Registry: change `[x]` to `[-]`.
-    -   Metadata: `status: "reverted"`, `reverted_at`, `updated_at`.
-    -   Keep the track directory and `review.md` for the audit trail.
+    -   If `conductor/tracks/<track-id>/` exists on the base, restore it together
+        with `conductor/tracks.md`.
+    -   If only `conductor/archive/<track-id>/` exists, restore the archive and
+        move it back onto the revert branch:
+        ```bash
+        git checkout origin/<base_branch> -- conductor/archive/<track-id> conductor/tracks.md
+        git mv conductor/archive/<track-id> conductor/tracks/<track-id>
+        # use <base_branch> instead when there is no remote
+        ```
+    -   If both paths exist, stop and ask the user which copy is canonical. Do not
+        merge the two directories.
+    -   If neither exists on the base, stop. Do not invent a track directory.
+    -   If `conductor/tracks.md` has no line for the track, add one:
+        `- [x] **Track: <Title>** — [<track-id>](./tracks/<track-id>/index.md) — <type> — <priority>`
+    -   If the track came from the archive, set `archived_at: null` and
+        `archive_path: null`.
+    -   Then update the track on the revert branch:
+        -   Registry: change `[x]` to `[-]`.
+        -   Metadata: `status: "reverted"`, `reverted_at`, `updated_at`.
+        -   Keep the track directory and `review.md` for the audit trail.
+
+    After the revert PR merges, `implement cleanup` archives the track again.
 5.  Write `conductor/tracks/<track-id>/verification/revert-track.md`.
 6.  Run the configured checks.
 7.  Stage the reverted files, restored artifacts, metadata, registry, and revert

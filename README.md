@@ -356,7 +356,36 @@ conductor/tracks/<track-id>/review.md
 
 Review never archives or deletes a track.
 
-### 5. Status
+### 5. Post-Merge Cleanup
+
+After the PR merges, run:
+
+```bash
+/conductor:conductor-implement cleanup
+```
+
+Cleanup runs from the base branch, fetches the base, and refreshes PR state with
+`gh` when available. It proves a branch is merged from the PR head or an
+ancestor check; it never guesses a squash or rebase merge. It then offers, with
+separate confirmations:
+
+- delete local merged branches;
+- delete remote branches that still exist;
+- remove clean merged worktrees;
+- archive merged `[x]` tracks and `[-]` tracks whose revert PR merged.
+
+Archiving uses `git mv`, removes the registry line, keeps `status: complete` or
+`status: reverted`, and records `archived_at` and `archive_path`. Each archived
+track gets its own commit. There is no automatic purge or permanent deletion.
+
+Archived tracks remain addressable: `status <id>` resolves the archive, and
+`revert track <id>` restores the track onto the revert branch before opening the
+revert PR. After that revert PR merges, cleanup archives it again.
+
+Status advertises cleanup when a merged track still has a live branch or has
+not been archived.
+
+### 6. Status
 
 ```bash
 /conductor:conductor-status
@@ -391,7 +420,7 @@ commands but never applies them.
 `--pr` queries PR state, mergeability, review decision, and checks for tracks
 with a PR URL. It does not poll or rerun checks.
 
-### 6. Revert
+### 7. Revert
 
 ```bash
 /conductor:conductor-revert phase 2
@@ -409,6 +438,9 @@ with a PR URL. It does not poll or rerun checks.
     PR is closed or intentionally kept. No history rewrite.
 -   **Merged track revert** creates `revert/<track-id>`, reverts the merge or
     squash commit, marks the track `[-]`, runs review, and opens a revert PR.
+-   **Archived track revert** restores `conductor/archive/<id>` to
+    `conductor/tracks/<id>` on the revert branch, then follows the merged-track
+    flow. Cleanup archives it again after the revert PR merges.
 -   **Task revert is not supported.** Squashing removes task commits; revert the
     phase and redo the task.
 
@@ -455,7 +487,7 @@ There is no `git reset --hard` path.
 | `/conductor:conductor-implement task P2.T3` | Execute one task inside a phase. |
 | `/conductor:conductor-implement status` | Show implementation state. |
 | `/conductor:conductor-implement recover` | Inspect and resume an interrupted phase. |
-| `/conductor:conductor-implement cleanup` | Clean merged branches and archive merged tracks. |
+| `/conductor:conductor-implement cleanup` | Prove merges, delete merged branches, and archive merged tracks. |
 | `/conductor:conductor-review` | Review the current track. |
 | `/conductor:conductor-review phase N` | Review one phase. |
 | `/conductor:conductor-review current` | Review uncommitted changes. |
