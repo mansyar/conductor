@@ -253,9 +253,10 @@ After the spec and plan are approved, Conductor:
    `conductor/index.md`.
 5. Commits the scaffold on the new branch.
 
-Track dependencies are resolved from `tracks.md`; if a dependency was archived
-after merge, Conductor reads `conductor/archive/<track-id>/metadata.json` and
-treats the completed, proven merge as satisfied.
+Track dependencies are resolved from `tracks.md`; completed tracks are archived
+on their own branch before the PR, so Conductor reads
+`conductor/archive/<track-id>/metadata.json` and treats the completed, proven
+merge as satisfied.
 
 **Generated artifacts:**
 
@@ -308,7 +309,9 @@ The primary agent:
 6. Syncs the docs.
 7. Runs `conductor-review`.
 8. Applies review fixes, re-reviews, and runs the post-review doc sync.
-9. Pushes, opens a PR when enabled, then marks the track complete.
+9. Archives the track and marks it complete, pushes, then opens a PR when
+   enabled. The archive move is part of the track branch, so the merged PR
+   carries it.
 
 If a phase is interrupted, run:
 
@@ -368,26 +371,30 @@ After the PR merges, run:
 /conductor:conductor-implement cleanup
 ```
 
-Cleanup runs from the base branch, fetches the base, and refreshes PR state with
+Cleanup runs from any worktree, fetches the base, and refreshes PR state with
 `gh` when available. It proves a branch is merged from the PR head or an
 ancestor check; it never guesses a squash or rebase merge. It then offers, with
 separate confirmations:
 
 - delete local merged branches;
 - delete remote branches that still exist;
-- stop background processes started from the project directory;
-- archive merged `[x]` tracks and `[-]` tracks whose revert PR merged.
+- stop background processes started from the project directory.
 
-Archiving uses `git mv`, removes the registry line, keeps `status: complete` or
-`status: reverted`, and records `archived_at` and `archive_path`. Each archived
-track gets its own commit. There is no automatic purge or permanent deletion.
+Cleanup does not archive anything, because the completion commit already moved
+the track into `conductor/archive/` before the PR. It only requires a clean
+tree, not a particular checked-out branch. If the base branch is checked out in
+another worktree, this worktree can detach instead. There is no automatic purge
+or permanent deletion.
+
+The registry is a permanent ledger: a completed track keeps its `[x]` line, with
+the link pointing at `./archive/<track-id>/index.md`, and a reverted track keeps
+its `[-]` line. Lines are not removed.
 
 Archived tracks remain addressable: `status <id>` resolves the archive, and
-`revert track <id>` restores the track onto the revert branch before opening the
-revert PR. After that revert PR merges, cleanup archives it again.
+`revert track <id>` edits the archived track in place on the revert branch.
+After the revert PR merges, cleanup only deletes the revert branch.
 
-Status advertises cleanup when a merged track still has a live branch or has
-not been archived.
+Status advertises cleanup when a merged track still has a live branch.
 
 ### 6. Status
 
@@ -441,9 +448,9 @@ with a PR URL. It does not poll or rerun checks.
     PR is closed or intentionally kept. No history rewrite.
 -   **Merged track revert** creates `revert/<track-id>`, reverts the merge or
     squash commit, marks the track `[-]`, runs review, and opens a revert PR.
--   **Archived track revert** restores `conductor/archive/<id>` to
-    `conductor/tracks/<id>` on the revert branch, then follows the merged-track
-    flow. Cleanup archives it again after the revert PR merges.
+-   **Archived track revert** edits `conductor/archive/<id>` in place on the
+    revert branch and follows the merged-track flow. Cleanup only deletes the
+    revert branch after the revert PR merges.
 -   **Task revert is not supported.** Squashing removes task commits; revert the
     phase and redo the task.
 
@@ -469,7 +476,7 @@ There is no `git reset --hard` path.
 | `conductor/tracks/<id>/verification/` | Per-phase, integrated, and revert evidence. |
 | `conductor/tracks/<id>/review.md` | Findings, coverage, verdict, debt. |
 | `conductor/tracks/<id>/pr.md` | Pull request body. |
-| `conductor/archive/` | Post-merge archive. |
+| `conductor/archive/` | Completed and reverted tracks, archived before their PR. |
 | `conductor/migration-report.md` | Legacy track inventory created by a 1.x upgrade. |
 | `.conductor/evidence/` | Large artifacts; gitignored. |
 | `.conductor/runs/` | Phase briefs and run state; gitignored. |
@@ -490,7 +497,7 @@ There is no `git reset --hard` path.
 | `/conductor:conductor-implement task P2.T3` | Execute one task inside a phase. |
 | `/conductor:conductor-implement status` | Show implementation state. |
 | `/conductor:conductor-implement recover` | Inspect and resume an interrupted phase. |
-| `/conductor:conductor-implement cleanup` | Prove merges, delete merged branches, and archive merged tracks. |
+| `/conductor:conductor-implement cleanup` | Prove merges, delete merged branches, and stop background processes. |
 | `/conductor:conductor-review` | Review the current track. |
 | `/conductor:conductor-review phase N` | Review one phase. |
 | `/conductor:conductor-review current` | Review uncommitted changes. |

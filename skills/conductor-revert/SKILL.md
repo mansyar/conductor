@@ -268,7 +268,9 @@ Use branch deletion, not `git revert`.
     -   **Close PR and delete the branch (Recommended).**
     -   **Close PR only** — keep the branch for audit.
 3.  If the choice is **Close PR and delete the branch**:
-    -   Check out the base branch.
+    -   Check out the base branch. If it is checked out in another worktree,
+        detach this worktree's HEAD (`git checkout --detach`) and make any
+        base-branch registry commit from the worktree that holds the base.
     -   Delete the local branch: `git branch -D <branch>`.
     -   If the remote branch exists and the user confirmed, delete it:
         `git push origin --delete <branch>`.
@@ -304,31 +306,39 @@ Use a reviewed revert PR.
         configured tool's commit list or `git log <base> --grep "<track-id>"`)
         and pass them to `git revert -n` in that order.
     -   On conflict, stop and offer abort or manual resolution.
-4.  Preserve the Conductor artifacts that the revert removed. Restore them from
-    the base branch as it was before the revert:
-    -   If `conductor/tracks/<track-id>/` exists on the base, restore it together
-        with `conductor/tracks.md`.
-    -   If only `conductor/archive/<track-id>/` exists, restore the archive and
-        move it back onto the revert branch:
+4.  Preserve the Conductor artifacts that the revert removed. Completed tracks
+    are archived before their PR, so the normal case is
+    `conductor/archive/<track-id>/` on the base:
+    -   If `conductor/archive/<track-id>/` exists on the base, restore it and
+        the registry from the base, keeping the archive layout:
         ```bash
         git checkout origin/<base_branch> -- conductor/archive/<track-id> conductor/tracks.md
-        git mv conductor/archive/<track-id> conductor/tracks/<track-id>
         # use <base_branch> instead when there is no remote
         ```
-    -   If both paths exist, stop and ask the user which copy is canonical. Do not
-        merge the two directories.
+        Never move it back to `conductor/tracks/`.
+    -   If `conductor/tracks/<track-id>/` exists on the base (legacy post-merge
+        layout, or a track abandoned before completion), restore it in place
+        together with `conductor/tracks.md`. Do not archive it here.
+    -   If both paths exist, stop and ask the user which copy is canonical. Do
+        not merge the two directories.
     -   If neither exists on the base, stop. Do not invent a track directory.
-    -   If `conductor/tracks.md` has no line for the track, add one:
-        `- [x] **Track: <Title>** — [<track-id>](./tracks/<track-id>/index.md) — <type> — <priority>`
-    -   If the track came from the archive, set `archived_at: null` and
-        `archive_path: null`.
-    -   Then update the track on the revert branch:
-        -   Registry: change `[x]` to `[-]`.
-        -   Metadata: `status: "reverted"`, `reverted_at`, `updated_at`.
-        -   Keep the track directory and `review.md` for the audit trail.
+    -   If `conductor/tracks.md` has no line for the track, add one with a link
+        to the resolved path:
+        `- [x] **Track: <Title>** — [<track-id>](./archive/<track-id>/index.md) — <type> — <priority>`
+    -   Then update the track in place:
+        -   Registry: change `[x]` to `[-]`; the link points at
+            `./archive/<track-id>/index.md` when archived and
+            `./tracks/<track-id>/index.md` otherwise.
+        -   Metadata: `status: "reverted"`, `reverted_at`, `updated_at`. Leave
+            `archived_at` and `archive_path` unchanged for an archived track.
+        -   Keep the track directory, `review.md`, and evidence for the audit
+            trail.
 
-    After the revert PR merges, `implement cleanup` archives the track again.
-5.  Write `conductor/tracks/<track-id>/verification/revert-track.md`.
+    The revert PR carries this state. After it merges, only branch cleanup
+    remains; nothing is archived after the merge.
+5.  Write `<resolved-track-dir>/verification/revert-track.md`, where
+    `<resolved-track-dir>` is `conductor/archive/<track-id>` or
+    `conductor/tracks/<track-id>`.
 6.  Run the configured checks.
 7.  Stage the reverted files, restored artifacts, metadata, registry, and revert
     record. Commit and capture the SHA:
@@ -338,11 +348,10 @@ Use a reviewed revert PR.
 8.  Record `revert_commit: "<sha>"` in metadata and commit the state:
     `conductor(revert): Record revert commit for track '<track-id>'`.
 9.  Run `conductor-review` on the revert branch with the explicit
-    `<base>..HEAD` range. It writes
-    `conductor/tracks/<track-id>/revert-review.md`, preserving the original
-    review. The revert PR must be reviewed before it is opened.
-10. Write the PR body to
-    `conductor/tracks/<track-id>/revert-pr.md` from
+    `<base>..HEAD` range. It writes `<resolved-track-dir>/revert-review.md`,
+    preserving the original review. The revert PR must be reviewed before it is
+    opened.
+10. Write the PR body to `<resolved-track-dir>/revert-pr.md` from
     `assets/revert-pr-template.md`, then stage and commit it:
     `conductor(revert): Add revert PR body for track '<track-id>'`.
 11. Push and create the PR with `pr.tool` (default `gh`) and
@@ -353,7 +362,7 @@ Use a reviewed revert PR.
       --base <pr.base or base_branch> \
       --head revert/<track-id> \
       --title "revert(<scope>): <track title>" \
-      --body-file conductor/tracks/<track-id>/revert-pr.md
+      --body-file <resolved-track-dir>/revert-pr.md
     ```
     For `glab`, use the equivalent merge-request command. If PR creation fails,
     stop and leave the revert branch for inspection. Set `pr_state:
@@ -368,8 +377,9 @@ Use a reviewed revert PR.
     -   The revert commit(s).
     -   Verification results.
     -   Risks and any data or migration notes.
-14. Do not archive the track. It stays visible as `[-]` until post-merge
-    cleanup.
+14. Do not move the track into or out of the archive. The revert PR already
+    carries the `[-]` marker and the metadata update; after it merges, run
+    `conductor-implement cleanup` to delete the revert branch.
 
 ### 6.3 Review-Fix Revert
 
@@ -407,7 +417,8 @@ Report:
 -   PR URL, if opened.
 -   Next action:
     -   Phase revert → rework the phase or re-run implement.
-    -   Track revert merged → merge the revert PR, then clean up/archive.
+    -   Track revert merged → merge the revert PR, then delete the revert
+        branch with `conductor-implement cleanup`.
     -   Track revert unmerged → branch deleted; no further action.
 
 ---
@@ -421,5 +432,6 @@ Report:
 -   Never delete an unmerged branch without confirming that its PR is closed or
     intentionally kept.
 -   Never open a merged-track revert PR without review.
--   Never archive or permanently delete a track here.
+-   Never move a track into or out of the archive here, and never permanently
+    delete one.
 -   Never mark a reverted track `[x]`. The registry marker is `[-]`.

@@ -323,6 +323,8 @@ nothing behind.
 > **Registry note:** `tracks.md` and `conductor/index.md` are committed on the
 > track branch. They merge into the base branch when the track merges. A track
 > on an unmerged branch will not appear in the registry on the base branch.
-> `conductor-status` shows the current branch by default; `--all` scans local
-> track branches read-only. When two track PRs both edit `tracks.md`, resolve the
-> merge conflict by keeping both registry lines.
+> Registry lines are a permanent ledger: completion changes the marker to `[x]`
+> and points the link at `./archive/<track-id>/index.md`; revert changes it to
+> `[-]`. Lines are never removed. `conductor-status` shows the current branch by
+> default; `--all` scans local track branches read-only. When two track PRs both
+> edit `tracks.md`, resolve the merge conflict by keeping both registry lines.

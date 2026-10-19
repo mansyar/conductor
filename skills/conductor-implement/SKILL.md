@@ -62,7 +62,7 @@ move the track through review to a pull request.
     -   `implement task P2.T3` — one task inside a phase.
     -   `implement status` — report phase state.
     -   `implement recover` — inspect and resume an interrupted phase.
-    -   `implement cleanup` — clean merged branches and archive merged tracks.
+    -   `implement cleanup` — clean merged branches.
     > `cleanup` is track-independent: skip track selection and go to Section 9.3.
     > `status` may infer the current `[~]` track but must not mutate anything.
     > `recover` selects the current `[~]` track or an explicitly named track.
@@ -158,8 +158,9 @@ Validate that:
 
 -   `none` → ready.
 -   A phase ID → that phase must have `**Status:** verified`.
--   A track ID → resolve it in `tracks.md`; if it is absent there, read
-    `conductor/archive/<track-id>/metadata.json`. The dependency is satisfied
+-   A track ID → resolve it in `tracks.md`; read its metadata from
+    `conductor/tracks/<track-id>/` or, for `[x]` and `[-]` entries, from
+    `conductor/archive/<track-id>/`. The dependency is satisfied
     only when `metadata.status` is `complete` and the merge is proven
     (`pr_state: "merged"`, `merged_at`, `merge_commit`, or the archived base is
     an ancestor of the current base). A `legacy`, `reverted`, or `abandoned`
@@ -470,15 +471,18 @@ PR without it.
 
 ---
 
-## 8. Prepare, Push, and Open a PR, then Complete the Track
+## 8. Complete, Archive, and Open a PR
+
+Archival happens **before** the PR is created. The completion commit moves the
+track into `conductor/archive/`, so merging the PR puts the archived track on the
+base branch. Nothing archives after the merge.
 
 ### 8.1 Prepare the Completion State
 
 1.  Recompute `metadata.progress` from the plan.
 2.  Confirm `metadata.doc_sync` is `updated` or `none`, and set `updated_at`.
-3.  Leave `metadata.status` as `in_progress` and the registry as `[~]`.
-    Completion is recorded after the PR step, or after the local completion path
-    when there is no remote or PRs are disabled.
+3.  Set `metadata.status: "complete"` in memory. Leave the registry at `[~]`
+    until the completion commit.
 4.  Do not commit yet.
 
 ### 8.2 Generate the PR Body
@@ -487,71 +491,78 @@ Read `conductor-implement/assets/pr-template.md` and fill it from:
 `metadata.json`, `plan.md`, the phase evidence files, `review.md`, and the final
 diff. Write `conductor/tracks/<track-id>/pr.md`.
 
-### 8.3 Commit the PR Body
+### 8.3 Archive and Mark Complete
 
-Stage `metadata.json` and `pr.md`. Commit:
-`chore(conductor): Prepare PR for track '<track-id>'`.
+1.  `git mv conductor/tracks/<track-id> conductor/archive/<track-id>`.
+2.  Update `conductor/tracks.md`: change `[~]` to `[x]` and rewrite the line's
+    link to `./archive/<track-id>/index.md`. Keep the line; registry lines are a
+    permanent ledger and are never removed.
+3.  Update `conductor/archive/<track-id>/metadata.json`:
+    -   `status: "complete"`
+    -   `archived_at` and `archive_path: "conductor/archive/<track-id>"`
+    -   `updated_at`
+    -   Leave `pr_url: null` and `pr_state: null`; Section 8.4 records them.
+4.  Stage the archive directory, `conductor/tracks.md`, and `metadata.json`.
+    Commit:
+    `chore(conductor): Complete and archive track '<track-id>'`.
 
-### 8.4 Push and Create the PR
+### 8.4 Push, Create the PR, and Record It
 
 1.  Detect a remote with `git remote`. If there is no remote, skip push and PR
-    creation; continue to Section 8.5 with `pr_url: null` and `pr_state: null`.
+    creation. The completion commit is the deliverable; `pr_url` and `pr_state`
+    stay `null`.
 2.  If a remote exists, push: `git push -u origin <branch>` (or `git push` when
     the upstream is already set).
-3.  Read `pr.enabled`. If it is false, skip PR creation and continue to Section
-    8.5. Keep `pr_url: null` and `pr_state: null`; the pushed branch is the
-    deliverable.
+3.  Read `pr.enabled`. If it is false, skip PR creation. Keep `pr_url: null` and
+    `pr_state: null`; the pushed branch is the deliverable.
 4.  If `pr.enabled` is true, use `pr.tool` from the Workflow Config. Default:
     `gh`. Build the title `<type>(<scope>): <track title>` and use
     `pr.base or base_branch` as the base.
-    -   **`gh`:**
+    -   **Existing PR:** inspect it with `gh pr view <branch>` (or
+        `gh pr list --head <branch>`).
+        -   `OPEN`: update the body with
+            `gh pr edit <url> --body-file conductor/archive/<track-id>/pr.md`.
+        -   `MERGED`: set `pr_state: "merged"` and continue to step 5.
+        -   `CLOSED`: stop and ask whether to reopen it or open a new PR. Do not
+            push the completion commit while the PR is closed and unmerged.
+    -   **Create:**
         ```bash
         gh pr create \
           --base <pr.base or base_branch> \
           --head <branch> \
           --title "<type>(<scope>): <title>" \
-          --body-file conductor/tracks/<track-id>/pr.md
+          --body-file conductor/archive/<track-id>/pr.md
         ```
-        Inspect an existing PR with `gh pr view`. If it is `OPEN`, update it with
-        `gh pr edit <url> --body-file conductor/tracks/<track-id>/pr.md`. If it
-        is `MERGED`, carry `pr_state: "merged"` to Section 8.5. If it is
-        `CLOSED`, stop and ask whether to reopen it or open a new PR; never mark
-        a track complete while its PR is closed and unmerged.
     -   **`glab`:** use the equivalent `glab mr create` and `glab mr view`/
         `glab mr update` commands with the same source branch, target branch,
-        title, and `pr.md` body. Apply the same `OPEN`/`MERGED`/`CLOSED`
-        handling.
-    -   **Other tool:** do not invent commands. Push the branch, write `pr.md`,
-        give the user the host's compare URL, and treat PR creation as
-        unavailable.
-5.  Capture the PR URL for Section 8.5. Do not record it in metadata yet.
-6.  If the configured tool is missing, unauthenticated, or fails: push, save
-    `pr.md`, give the user the compare URL, and record `pr_state:
-    "unavailable"` for Section 8.5.
+        title, and body. Apply the same `OPEN`/`MERGED`/`CLOSED` handling.
+    -   **Other tool:** do not invent commands. Push the branch, give the user
+        the host's compare URL, and treat PR creation as unavailable.
+5.  Record the PR in `conductor/archive/<track-id>/metadata.json`:
+    -   `pr_url`: the PR URL, or `null` when creation failed
+    -   `pr_state`: `"open"` when created or updated, `"merged"` when already
+        merged, `"unavailable"` when creation was configured but failed
+    -   `updated_at`
+    Commit `chore(conductor): Record PR for track '<track-id>'` and push.
+6.  If the configured tool is missing, unauthenticated, or fails: push, give the
+    user the compare URL, and record `pr_state: "unavailable"` with the
+    metadata-only commit from step 5.
     -   GitHub:
         `https://github.com/<owner>/<repo>/compare/<base>...<branch>?expand=1`
     -   GitLab: the equivalent merge-request URL for the repository.
-
-### 8.5 Mark the Track Complete
-
-1.  Update `tracks.md`: `[~]` → `[x]`.
-2.  Update `metadata.json`:
-    -   `status: "complete"`
-    -   `pr_url`: the created PR URL, or `null`.
-    -   `pr_state`: `"open"` when a PR was created, `"merged"` when it was
-        already merged, `"unavailable"` when PR creation was configured but
-        could not run, and `null` when PRs are disabled or there is no remote.
-    -   `updated_at`
-3.  Stage `tracks.md` and `metadata.json`. Commit:
-    `chore(conductor): Mark track '<title>' as complete`.
-4.  If a remote exists, push the completion commit: `git push`.
-5.  Do not poll for merge. Do not merge the PR automatically.
+7.  Every commit made after the PR is created must touch only `conductor/**`.
+    Cleanup relies on this to tell the PR recording commit apart from code
+    drift.
+8.  Do not poll for merge. Do not merge the PR automatically.
 
 ---
 
 ## 9. Cleanup and Status
 
 ### 9.1 `implement status`
+
+Resolve track metadata from `conductor/tracks/<track-id>/metadata.json` first,
+then `conductor/archive/<track-id>/metadata.json`.
 
 Report:
 
@@ -617,15 +628,19 @@ uncommitted work without explicit confirmation.
 
 ### 9.3 `implement cleanup`
 
-Cleanup is track-independent. Do not select a track. It removes merged branches
-and archives merged tracks in one flow.
+Cleanup is track-independent. Do not select a track. It deletes merged branches;
+archival already happened at completion, so cleanup never moves or commits track
+files. It works from any worktree, including a detached HEAD.
 
-1.  **Preflight:** Run from the configured base branch with a clean tree.
+Resolve track metadata from `conductor/tracks/<track-id>/metadata.json` first,
+then `conductor/archive/<track-id>/metadata.json`.
+
+1.  **Preflight:** Require a clean tree. No particular branch is required.
     -   `git status --porcelain`, ignoring `.conductor/`. If anything else is
         dirty, stop and ask the user to commit or stash it.
-    -   If the current branch is a track or revert branch and the tree is clean,
-        offer to check out the base branch first. Otherwise stop.
     -   Fetch the base when a remote exists and `git.fetch` is true.
+    -   If the current branch is a track or revert branch, Step 5 handles it;
+        do not demand a base checkout.
 
 2.  **Refresh PR state:** For every `[x]` track with `pr_url` and every `[-]`
     track with `revert_pr_url`, query the PR with the configured `pr.tool`
@@ -636,7 +651,7 @@ and archives merged tracks in one flow.
     ```
 
     For `glab`, use the equivalent merge-request view command. Keep the result
-    in memory. Do not write metadata until the user confirms cleanup. If the
+    in memory. Do not write metadata unless the user confirms cleanup. If the
     configured tool is missing or unauthenticated, mark the state unknown and
     use local proof only.
 
@@ -647,19 +662,21 @@ and archives merged tracks in one flow.
         `git merge-base --is-ancestor <branch> <base>` succeeds.
     -   **Squash or rebase with no PR proof:** do not guess. Show
         `git log <base> --grep "<track-id>"` and ask the user to confirm. Never
-        delete or archive on a guess.
+        delete a branch on a guess.
 
-    If the branch tip differs from the PR head, the branch advanced after the
-    PR. Warn and leave it alone; do not archive it as fully merged.
+    If the branch tip differs from the PR head, the branch advanced after the PR.
+    Accept the difference only when every extra commit touches `conductor/**`
+    (`git diff --name-only <headRefOid>..<branch>`); those are the PR-recording
+    commits from Section 8.4. Any changed file outside `conductor/**` means real
+    drift: warn and leave the branch alone.
 
 4.  **Present the candidates:** one table with track ID, branch, PR, merge proof,
-    archive state, and whether a remote branch exists. Candidate branches are
+    archive location, and whether a remote branch exists. Candidate branches are
     `metadata.branch` for `[x]` tracks and `revert/<track-id>` for `[-]` tracks.
     Show other prefix branches separately; never delete them without an explicit
     per-branch confirmation. Ask for confirmation separately for:
     -   Deleting local branches.
     -   Deleting remote branches, when the remote branch still exists.
-    -   Archiving tracks.
 
     Allow **All**, **Select**, and **Skip** for each.
 
@@ -672,63 +689,42 @@ and archives merged tracks in one flow.
     Interaction Protocol: numbered options in text, one question at a time.
 
 5.  **Delete local branches:**
-    -   `git branch -d <branch>` when the branch is an ancestor of the base.
+    -   `git branch -d <branch>` when the branch is an ancestor of the base or
+        its upstream is gone and the PR proved the merge.
     -   `git branch -D <branch>` only with PR-merged proof and explicit
         confirmation.
-    -   If the current branch is the candidate, check out the base first.
+    -   If the current branch is the candidate, check out the base branch when
+        possible. If the base is already checked out in another worktree, detach
+        the current worktree's HEAD (`git checkout --detach`) after the deletion
+        confirmation.
     -   If deletion fails because the branch is checked out in another
         worktree, locate it with `git worktree list`. If it is not the main
         worktree, detach its HEAD with `git -C <path> checkout --detach` and
         retry the deletion. Never use `--force` there and never delete the
         worktree directory. If it is the main worktree, stop and ask the user
         to switch it to another branch first.
-    -   Never delete an unmerged branch, a branch with commits newer than the PR
-        head, or a branch belonging to a dirty worktree.
+    -   Never delete an unmerged branch, a branch whose non-`conductor/**`
+        commits are newer than the PR head, or a branch belonging to a dirty
+        worktree.
 
 6.  **Delete remote branches:** Check `git ls-remote --heads origin <branch>`.
     If it still exists and the user confirmed, run
     `git push origin --delete <branch>`. Do not delete a remote branch whose PR
     is not merged.
 
-7.  **Stop background processes:** Before archiving, end every background
-    process started from the project working directory during this track's
-    work — dev servers, file watchers, and watch-mode test runners. On
-    OpenCode, terminate the session's background shells whose working directory
-    is the project root. A process holding a lock on a directory will make the
-    `git mv` archive step fail, especially on Windows. If a background process
+7.  **Stop background processes:** End every background process started from the
+    project working directory during this track's work — dev servers, file
+    watchers, and watch-mode test runners — so nothing keeps running from a
+    deleted branch's checkout. On OpenCode, terminate the session's background
+    shells whose working directory is the project root. If a background process
     cannot be attributed to this project, report it and leave it running.
 
-8.  **Archive merged tracks:** For each confirmed `[x]` track whose branch is
-    merged, or `[-]` track whose revert PR is merged:
-    -   Require a clean tree and the base branch.
-    -   Stop if `conductor/tracks/<track-id>/` is missing or
-        `conductor/archive/<track-id>/` already exists. Do not overwrite either
-        path.
-    -   `git mv conductor/tracks/<track-id>/ conductor/archive/<track-id>/`.
-    -   Remove the track's line from `conductor/tracks.md`.
-    -   Update `metadata.json`:
-        -   Keep `status: "complete"` or `"reverted"`. Archive is storage, not a
-            workflow state.
-        -   Set `archived_at`, `archive_path` to
-            `conductor/archive/<track-id>`, and `updated_at`.
-        -   When a PR proved the merge:
-            -   For a `[x]` track, set `pr_state: "merged"`, `merged_at`, and
-                `merge_commit` from the original PR.
-            -   For a `[-]` track, set `pr_state: "merged"` from the revert PR;
-                leave the original `merged_at` and `merge_commit` unchanged.
-    -   Remove `.conductor/runs/<track-id>.json` if it exists.
-    -   Keep `metadata.json`, `review.md`, `pr.md`, `revert-pr.md`, and
-        verification records in the archive.
-    -   Stage the archive directory, `conductor/tracks.md`, and `metadata.json`.
-        Commit one track at a time:
-        `chore(conductor): Archive track '<track-id>'`.
-
-9.  **No purge:** Never permanently delete an archived track. There is no
+8.  **No purge:** Never permanently delete an archived track. There is no
     automatic retention or purge step. A user who wants deletion must do it
     manually with a separate explicit confirmation.
 
-10. Report stopped background processes, deleted branches, archived tracks,
-    skipped candidates, and any branch whose merge could not be proven.
+9.  Report stopped background processes, deleted branches, skipped candidates,
+    and any branch whose merge could not be proven.
 
 ---
 
@@ -740,10 +736,10 @@ and archives merged tracks in one flow.
 -   Do not mark a phase `verified` with a failed or unrun required check.
 -   Do not mark a track complete before review passes, unless every remaining
     blocking finding has an explicit user override recorded in `review.md`.
--   Do not mark it complete before the PR exists when a remote and `pr.enabled`
-    are configured, unless PR creation is unavailable.
+-   Do not push the completion commit when an existing PR for the branch is
+    closed and unmerged.
 -   Do not push or open a PR before review and post-review doc sync.
--   Do not delete a branch or archive a track without proven merge.
+-   Do not delete a branch without proven merge.
 -   Do not use `git branch -D` without PR-merged proof and confirmation.
 -   Do not permanently delete an archived track or purge history.
 -   Do not stage unrelated files.

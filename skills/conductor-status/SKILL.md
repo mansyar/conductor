@@ -67,7 +67,9 @@ it reports problems and exact repair commands for the user to approve.
 1.  Parse `conductor/tracks.md` for `[ ]`, `[~]`, `[x]`, and `[-]` entries. If
     the requested track ID is absent, check
     `conductor/archive/<track-id>/metadata.json` for an archived track.
-2.  Read every track's `metadata.json`.
+2.  Read every track's `metadata.json`. Resolve
+    `conductor/tracks/<track-id>/metadata.json` first; for `[x]` and `[-]`
+    entries, fall back to `conductor/archive/<track-id>/metadata.json`.
 3.  Read the plan for every **active** track (`[~]` or metadata
     `in_progress`), and for any track in `fixes` or `doc_sync`.
 4.  For completed tracks, trust `metadata.progress` unless `--verify` is set.
@@ -94,7 +96,9 @@ it reports problems and exact repair commands for the user to approve.
     Keep branches under `feat/`, `fix/`, `chore/`, `refactor/`, and `revert/`.
 2.  For each branch, find track metadata without checking it out:
     ```bash
-    git ls-tree -r --name-only <branch> -- 'conductor/tracks/*/metadata.json'
+    git ls-tree -r --name-only <branch> -- \
+      'conductor/tracks/*/metadata.json' \
+      'conductor/archive/*/metadata.json'
     git show <branch>:<path>
     ```
 3.  Read the branch's `conductor/tracks.md` when present to get the registry
@@ -219,7 +223,7 @@ States are factual, not schedule-based.
 | `fixes` | Review is `BLOCK`, a review-fix phase is pending, or review is `SUPERSEDED`. |
 | `doc_sync` | Review passed; post-review documentation sync is pending. |
 | `pr_open` | Complete, PR open, awaiting review/merge. |
-| `complete` | Complete and merged, complete with no remote, `pr.enabled: false`, or PR creation recorded as unavailable. A closed unmerged PR is not complete. |
+| `complete` | Complete and merged, complete with no remote, `pr.enabled: false`, or PR creation recorded as unavailable. A closed unmerged PR is not complete. Complete tracks live in `conductor/archive/` and keep their registry line. |
 | `reverted` | Track was reverted after merge; registry marker `[-]`. |
 | `abandoned` | Track was abandoned before merge; registry marker `[-]` or entry removed. |
 | `drift` | Registry, metadata, plan, and git state disagree. Show the conflict; do not guess. |
@@ -229,8 +233,9 @@ Derivation order:
 1.  `[-]` or metadata `reverted`/`abandoned` → terminal state.
 2.  Metadata `legacy: true` → `legacy`.
 3.  Metadata or plan says `blocked` → `blocked`.
-4.  Unmet `depends_on` → `blocked`. Resolve each dependency in `tracks.md`; if
-    it is absent there, read `conductor/archive/<track-id>/metadata.json`.
+4.  Unmet `depends_on` → `blocked`. Resolve each dependency in `tracks.md` and
+    read its metadata from `conductor/tracks/<track-id>/` or
+    `conductor/archive/<track-id>/`.
     Archived complete dependencies with proven merges are satisfied; `legacy`,
     `reverted`, and `abandoned` dependencies are not.
 5.  Review verdict `BLOCK` or `SUPERSEDED`, or a pending `Phase R` → `fixes`.
@@ -278,12 +283,13 @@ Derive one concrete next action per track:
     -   otherwise → "Await review/merge".
 -   `complete`:
     -   `pr_state: "unavailable"` → "Open the PR manually".
-    -   not archived, branch exists, and merge is proven → "Run
-        conductor-implement cleanup".
+    -   not archived (legacy layout) → "Archive the track directory on the
+        base branch (legacy layout)".
+    -   branch exists and merge is proven → "Run conductor-implement cleanup".
     -   otherwise → "None".
 -   `reverted` with `pr_state: "unavailable"` → "Open the revert PR manually".
--   `reverted` with `pr_state: "merged"` and no `archived_at` → "Run
-    conductor-implement cleanup".
+-   `reverted` with `pr_state: "merged"` and no `archived_at` → "Archive the
+    track directory on the base branch (legacy layout)".
 -   `reverted` with `revert_pr_url` or `pr_state: "open"` → "Review and merge
     revert PR".
 -   `reverted` / `abandoned` otherwise → "None".
@@ -311,8 +317,11 @@ Report every mismatch; never hide or auto-fix it:
 -   Dirty working tree.
 -   Local track branches not present in the current branch's registry.
 -   `[-]` track with a live track branch.
--   An archived track that still appears in `tracks.md` or
+-   An archived track whose directory still exists under
     `conductor/tracks/`.
+-   A `[x]` track whose directory is still under `conductor/tracks/`; completion
+    archives it before the PR, so this means the completion commit is missing or
+    the project is on the legacy post-merge layout.
 -   `metadata.archived_at` without a matching `archive_path`, or the reverse.
 -   An archived track with a live local branch.
 -   Duplicate track IDs or duplicate registry entries.

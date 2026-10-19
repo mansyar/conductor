@@ -416,7 +416,8 @@ If `review.issues.enabled` is false, record everything in `review.md` Debt.
 
 ## 9. Handoff
 
-Review never archives, deletes, or moves a track. Post-merge cleanup owns that.
+Review never archives, deletes, or moves a track. `conductor-implement` archives
+it in the completion commit after review passes.
 
 When review is done:
 
