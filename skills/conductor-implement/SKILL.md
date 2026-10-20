@@ -601,7 +601,23 @@ checks.
     the same confirmation.
 10. If the host rejects the merge (protection rules, conflicts, stale head),
     report its message verbatim and stop. Do not retry with elevated flags.
-11. On success, report the merge commit, then run Section 9.3 cleanup.
+11. On success, report the merge commit, then clean up the branch locally and on
+    the remote without asking again: the merge you just performed is the proof.
+    -   Refresh state with
+        `gh pr view <url> --json state,mergeCommit` and require `state:
+        "MERGED"` before deleting anything.
+    -   If the current branch is the merged branch, check out the base branch.
+        When the base is checked out in another worktree, detach this worktree's
+        HEAD (`git checkout --detach`) and continue.
+    -   `git branch -d <branch>`. When `-d` refuses because the merge was a
+        squash or rebase, use `git branch -D <branch>`.
+    -   If deletion fails because the branch is checked out in another
+        worktree, detach that worktree when it is not the main worktree and
+        retry; if it is the main worktree, report it and leave the branch.
+    -   `git push origin --delete <branch>` when
+        `git ls-remote --heads origin <branch>` still shows the branch.
+    -   Then run Section 9.3 for any other merged branches and for the
+        background-process step. Do not re-confirm this branch; it is gone.
 
 ---
 
@@ -727,6 +743,9 @@ then `conductor/archive/<track-id>/metadata.json`.
     -   Deleting remote branches, when the remote branch still exists.
 
     Allow **All**, **Select**, and **Skip** for each.
+
+    Branches already deleted by Section 8.5 after an approved merge are not
+    candidates and are not asked about again.
 
     On hosts with a native question tool (OpenCode), present these
     confirmations with it: one grouped call containing one single-choice

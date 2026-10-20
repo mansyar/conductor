@@ -317,8 +317,10 @@ If `pr.watch_ci` is true in `conductor/workflow.md`, the agent then watches CI
 for up to `pr.watch_timeout_minutes` (default 15). When every check passes and
 the PR is mergeable, it asks whether to merge and uses `pr.merge_method`
 (default `squash`). It never merges without your answer, never bypasses required
-review, and stops watching when the cap is reached. You can run the same watch
-later without redoing completion:
+review, and stops watching when the cap is reached. After an approved merge it
+deletes the track branch locally and on the remote without asking again, then
+continues with cleanup. You can run the same watch later without redoing
+completion:
 
 ```bash
 /conductor:conductor-implement watch
