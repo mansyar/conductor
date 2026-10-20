@@ -63,7 +63,9 @@ move the track through review to a pull request.
     -   `implement status` — report phase state.
     -   `implement recover` — inspect and resume an interrupted phase.
     -   `implement cleanup` — clean merged branches.
+    -   `implement watch [<track-id>]` — wait for PR checks and offer a merge.
     > `cleanup` is track-independent: skip track selection and go to Section 9.3.
+    > `watch` resolves its own track and goes to Section 9.4.
     > `status` may infer the current `[~]` track but must not mutate anything.
     > `recover` selects the current `[~]` track or an explicitly named track.
 2.  **Read the Registry:** Parse `conductor/tracks.md` for `[ ]`, `[~]`, `[x]`,
@@ -553,7 +555,53 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
 7.  Every commit made after the PR is created must touch only `conductor/**`.
     Cleanup relies on this to tell the PR recording commit apart from code
     drift.
-8.  Do not poll for merge. Do not merge the PR automatically.
+8.  Do not poll for merge here. Section 8.5 watches only when `pr.watch_ci` is
+    true. Never merge the PR without an explicit confirmation.
+
+### 8.5 Watch CI and Offer a Merge
+
+Run only when `pr.watch_ci` is true, a PR exists, and it has checks. Skip
+silently when the flag is false; report and skip when there is no PR or no
+checks.
+
+1.  Snapshot the PR:
+    `gh pr view <url> --json state,isDraft,mergeable,reviewDecision,statusCheckRollup`.
+2.  If `statusCheckRollup` is empty, report "no checks configured" and stop.
+3.  Watch with a cap:
+    ```bash
+    gh pr checks <url> --watch --interval 20
+    ```
+    Call it once, with the harness timeout set to `pr.watch_timeout_minutes`
+    (default 15). `gh` has no timeout flag of its own.
+4.  If the call times out or checks are still pending, report the pending checks
+    and stop. Say plainly that watching stopped; do not imply CI failed and do
+    not promise background monitoring.
+5.  If any check failed, report the failing check names and stop. Do not offer a
+    merge.
+6.  If every check passed, require all of:
+    -   `mergeable: "MERGEABLE"`
+    -   `isDraft: false`
+    -   `reviewDecision` is neither `"REVIEW_REQUIRED"` nor
+        `"CHANGES_REQUESTED"`
+
+    If a condition fails, report which one and stop. Never bypass required
+    review, branch protection, or a draft state.
+7.  Ask one single-choice question: **Merge now** (Recommended), **Leave open**,
+    **Stop**. Use the native question tool on OpenCode; otherwise numbered text
+    options, one question at a time.
+8.  On **Merge now**, merge with the configured method and without deleting
+    branches:
+    ```bash
+    gh pr merge <url> --squash
+    ```
+    Use `--merge` or `--rebase` when `pr.merge_method` says so; default
+    `squash`. Never pass `--admin`, `--auto`, or `--delete-branch`. Branch
+    deletion stays in Section 9.3.
+9.  For `glab`, use `glab mr view` and `glab mr merge` with the same checks and
+    the same confirmation.
+10. If the host rejects the merge (protection rules, conflicts, stale head),
+    report its message verbatim and stop. Do not retry with elevated flags.
+11. On success, report the merge commit, then run Section 9.3 cleanup.
 
 ---
 
@@ -726,6 +774,19 @@ then `conductor/archive/<track-id>/metadata.json`.
 9.  Report stopped background processes, deleted branches, skipped candidates,
     and any branch whose merge could not be proven.
 
+### 9.4 `implement watch [<track-id>]`
+
+Wait for PR checks and offer a merge without redoing completion.
+
+1.  Resolve the track: the named track, otherwise the `[x]` track on the current
+    branch, otherwise ask. Read metadata from `conductor/tracks/<track-id>/`
+    first, then `conductor/archive/<track-id>/`.
+2.  Require `pr_url` and `pr_state: "open"`. If the PR is already merged, report
+    it and offer cleanup instead. If `pr_url` is missing, report that no PR was
+    recorded and stop.
+3.  Run Section 8.5. Ignore `pr.watch_ci` here: an explicit `watch` request is
+    the opt-in.
+
 ---
 
 ## 10. Hard Rules
@@ -740,6 +801,8 @@ then `conductor/archive/<track-id>/metadata.json`.
     closed and unmerged.
 -   Do not push or open a PR before review and post-review doc sync.
 -   Do not delete a branch without proven merge.
+-   Do not merge a PR without an explicit confirmation from the user.
+-   Do not use `--admin`, `--auto`, or `--delete-branch` when merging.
 -   Do not use `git branch -D` without PR-merged proof and confirmation.
 -   Do not permanently delete an archived track or purge history.
 -   Do not stage unrelated files.

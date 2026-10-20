@@ -263,7 +263,9 @@ project-specific document, not a generic copy.
       per phase under `conductor/tracks/<track-id>/verification/`, with large
       artifacts under `.conductor/evidence/`. Do not offer to relocate them.
     - Git base branch, whether to fetch before branching, branch push behavior,
-      and PR policy: enabled, tool (`gh`/`glab`), and base branch
+      and PR policy: enabled, tool (`gh`/`glab`), base branch, whether to watch
+      CI after opening the PR, the watch cap in minutes, and the merge method
+      (`squash`/`merge`/`rebase`)
     - Review policy: strict mode, whether deferred findings become GitHub issues,
       minimum issue severity, whether Low findings are grouped, and issue labels
     - Documentation sync expectations

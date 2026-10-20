@@ -313,6 +313,17 @@ The primary agent:
    enabled. The archive move is part of the track branch, so the merged PR
    carries it.
 
+If `pr.watch_ci` is true in `conductor/workflow.md`, the agent then watches CI
+for up to `pr.watch_timeout_minutes` (default 15). When every check passes and
+the PR is mergeable, it asks whether to merge and uses `pr.merge_method`
+(default `squash`). It never merges without your answer, never bypasses required
+review, and stops watching when the cap is reached. You can run the same watch
+later without redoing completion:
+
+```bash
+/conductor:conductor-implement watch
+```
+
 If a phase is interrupted, run:
 
 ```bash
@@ -498,6 +509,7 @@ There is no `git reset --hard` path.
 | `/conductor:conductor-implement status` | Show implementation state. |
 | `/conductor:conductor-implement recover` | Inspect and resume an interrupted phase. |
 | `/conductor:conductor-implement cleanup` | Prove merges, delete merged branches, and stop background processes. |
+| `/conductor:conductor-implement watch` | Wait for PR checks, then offer a merge. |
 | `/conductor:conductor-review` | Review the current track. |
 | `/conductor:conductor-review phase N` | Review one phase. |
 | `/conductor:conductor-review current` | Review uncommitted changes. |
