@@ -64,7 +64,7 @@ pr:
   enabled: true
   tool: "gh"
   base: "{{BASE_BRANCH}}"
-  media: "ask"
+  media: "always"
   watch_ci: false
   watch_timeout_minutes: 15
   merge_method: "squash"

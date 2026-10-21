@@ -264,9 +264,9 @@ project-specific document, not a generic copy.
       artifacts under `.conductor/evidence/`. Do not offer to relocate them.
     - Git base branch, whether to fetch before branching, branch push behavior,
       and PR policy: enabled, tool (`gh`/`glab`), base branch, whether visual
-      tracks include a media demo in the PR body (`ask`/`always`/`never`),
-      whether to watch CI after opening the PR, the watch cap in minutes, and
-      the merge method (`squash`/`merge`/`rebase`)
+      tracks include a media demo in the PR body (`always`/`ask`/`never`,
+      default `always`), whether to watch CI after opening the PR, the watch
+      cap in minutes, and the merge method (`squash`/`merge`/`rebase`)
     - Media support: a media demo in the PR body needs GitHub CLI 2.99.0 or
       later and works on GitHub only. Run `gh --version` and report the
       version.
