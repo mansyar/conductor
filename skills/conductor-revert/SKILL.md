@@ -34,7 +34,9 @@ tracks.
     is empty, report that there is nothing to revert.
 3.  **Read the Workflow Config:** Read `git.base_branch`, `git.fetch`, `pr.enabled`,
     and `pr.tool` from `conductor/workflow.md`. If the workflow is missing, use
-    `main` and note the fallback.
+    `main` and note the fallback. For a key that is absent, use these
+    defaults: `git.base_branch` → `main`, `git.fetch` → `true`,
+    `pr.enabled` → `true`, `pr.tool` → `gh`, `pr.base` → `git.base_branch`.
 4.  **Read the Track:** For the selected track, read `metadata.json`, `plan.md`,
     `spec.md`, and `review.md` when present. Resolve `conductor/tracks/<track-id>`
     first; if the user explicitly names an archived track, resolve

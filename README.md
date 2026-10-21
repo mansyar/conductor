@@ -163,6 +163,32 @@ manually. `conductor-status` shows them as `legacy`.
 A **fresh start** option is also offered: it backs up the old directory, then
 runs setup from the beginning.
 
+## Updating Conductor
+
+When a newer Conductor release changes the skills or their templates, re-run
+setup in the project:
+
+```text
+/conductor:conductor-setup
+```
+
+Setup detects that the project is already initialized and compares the project's
+`conductor/workflow.md` and installed OpenCode agents with the current
+templates. It reports what is out of date and offers:
+
+- **Refresh (Recommended):** add the missing Workflow Config keys with their
+  defaults, keep every existing value, and refresh the agent files.
+- **Refresh and review every field:** re-run the configuration interview, then
+  refresh the agent files.
+- **Keep everything** / **Cancel:** change nothing.
+
+A missing key is not a problem in the meantime. Every optional key has a
+documented default, so a project configured before a key existed keeps working:
+`conductor-implement`, `conductor-status`, and `conductor-revert` each apply
+the default when a key is absent (`pr.media` → `always`, `pr.watch_ci` →
+`false`, `pr.merge_method` → `squash`, `pr.base` → `git.base_branch`, and so
+on).
+
 --------------------------------------------------------------------------------
 
 ## Uninstallation

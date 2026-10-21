@@ -57,7 +57,11 @@ Read the returned JSON object from `stdout`. **Do NOT mention the script name or
 - If `upgrade_required` is `true`, or the user invoked `setup upgrade`, do **not** halt. Present a compatibility report and follow Section 2.8:
     - Detected schema version, missing Workflow Config, missing Tracks section, missing `.conductor/` ignore, and agent status.
     - Every track with legacy metadata or a non-v2 plan/spec as a migration warning; these do not by themselves make the environment incomplete after migration.
-- If `setup_complete` is `true`, announce that the project is already initialized on the current version. If `track_issues` is non-empty, report them as legacy-track warnings and point to `conductor/migration-report.md`, then **HALT** execution.
+- If `setup_complete` is `true`, go to Section 2.10 (Maintenance Refresh)
+  instead of halting. It compares the project's configuration and installed
+  agents with the current templates and offers a refresh. If `track_issues` is
+  non-empty, report them as legacy-track warnings and point to
+  `conductor/migration-report.md`.
 - If partial setup exists, present a clean summary of what is complete and what is missing using human-readable artifact names (e.g., `tech-stack.md`). Do NOT use internal section numbers (e.g., avoid "Section 2.3").
 - Identify the pending step from `next_step` (e.g., "Technology Stack"). If it is `Conductor Subagents`, resume at Section 2.7. If the only gaps are `tracks.md`, the Tracks section, or `.conductor/`, resume at Section 3 (Finalization).
 
@@ -340,7 +344,9 @@ Conductor ships two project-local subagent profiles:
    `assets/agents/conductor-reviewer.md` to `.opencode/agents/`. The phase
    template denies edits under `conductor/` but allows its own evidence file
    under `conductor/tracks/*/verification/` and artifacts under
-   `.conductor/evidence/`. Keep both rules.
+   `.conductor/evidence/`. Keep both rules. Keep the template version comment
+   (`<!-- Conductor agent template: v2.0 -->`) in the installed file; Section
+   2.9 uses it to detect a stale agent.
 4. **Fill the Shell Allowlist:** Read the `## Workflow Config` block in the newly
    written `conductor/workflow.md`. In each agent file, replace the
    `PROJECT COMMANDS` or `PROJECT CHECKS` marker block with one `shell` allow
@@ -507,6 +513,46 @@ an optional convenience, not a requirement.
    are intact, and no unrelated content was removed.
 5. **Commit:** Stage `AGENTS.md` in the Section 3 commit stage. Do not create the
    file when the user selects Skip.
+
+### 2.10 Maintenance Refresh (Initialized Project)
+
+Run this section when the project is already initialized (`setup_complete` is
+`true`). The goal is to pick up changes in the skill's own templates without
+re-interviewing the project.
+
+1. **Compare the Configuration:** Read the `## Workflow Config` block of
+   `conductor/workflow.md` and the `## Workflow Config` block of
+   `assets/workflow.md`. List the keys the template defines that the project
+   does not have. Compare only this block; report other template changes as
+   informational, not as work to do.
+2. **Compare the Installed Agents:** On an OpenCode host, read the template
+   version comment in `.opencode/agents/conductor-phase.md` and
+   `.opencode/agents/conductor-reviewer.md` and compare it with the comment in
+   `assets/agents/`. A different version means the installed agent is stale.
+   Also flag an installed file that still contains a `PROJECT COMMANDS` or
+   `PROJECT CHECKS` marker block.
+3. **Report:** Show one short list of what is out of date: missing config keys
+   with their defaults, stale agent files, and any other template change worth
+   knowing. When nothing is out of date, say the project is current and HALT.
+4. **Offer a Single-Choice Question:**
+   -   **Refresh (Recommended):** add the missing config keys with their
+        defaults, keep every existing value, and refresh the agent files.
+   -   **Refresh and review every field:** run the full Section 2.5 interview in
+        Customize mode, rewrite `workflow.md`, then refresh the agent files.
+   -   **Keep everything:** change nothing and HALT.
+   -   **Cancel:** change nothing and HALT.
+5. **Apply a Config Refresh:** Edit `conductor/workflow.md` in place. Keep the
+   existing text, values, and ordering; add each missing key with the default
+   from the template, in the template's own section. Do not reformat the file
+   and do not remove values the project set. Leave the file uncommitted and say
+   so — Conductor commits are owned by `conductor-implement`.
+6. **Refresh the Agents:** Run Section 2.7. The agent files already exist, so
+   its Keep / Replace / Back up and Replace question applies. After the
+   refresh, each installed file must have no marker block and at least one
+   shell allow rule per configured command.
+7. **Report and Halt:** List the config keys added, the agent files refreshed,
+   and the files left unchanged. A refresh never starts a track and never
+   touches `conductor/tracks/`.
 
 ---
 

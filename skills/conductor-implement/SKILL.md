@@ -46,6 +46,12 @@ move the track through review to a pull request.
         `conductor/tracks/<track-id>/verification/` and `.conductor/evidence/`.
     -   `review.strict`, `review.issues`
     -   `pr.enabled`, `pr.tool`, `pr.base`, `pr.media`
+    -   **Defaults for absent keys:** a project configured before a key existed
+        keeps working without a refresh. `pr.enabled` → `true`, `pr.tool` →
+        `gh`, `pr.base` → `git.base_branch`, `pr.media` → `always`,
+        `pr.watch_ci` → `false`, `pr.watch_timeout_minutes` → `15`,
+        `pr.merge_method` → `squash`, `git.base_branch` → `main`,
+        `git.fetch` → `true`.
 4.  **Load Style Guides:** List `conductor/code_styleguides/`. Pass the relevant
     guides to the phase subagent.
 

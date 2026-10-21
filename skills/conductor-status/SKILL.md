@@ -33,7 +33,10 @@ branches.
     `conductor-new-track`.
 3.  **Load the Workflow Config:** Read `git.base_branch`, `pr.enabled`, and
     `pr.tool` from `conductor/workflow.md`. If the workflow is missing, use
-    `main`, assume PRs are enabled, and add a warning.
+    these defaults for a key that is absent: `git.base_branch` → `main`,
+    `pr.enabled` → `true`, `pr.tool` → `gh`, `pr.base` → `git.base_branch`,
+    `pr.media` → `always`. When the workflow is missing, also add a warning
+    that PRs are assumed enabled.
 4.  **Do Not Halt for Context Docs:** Missing `product.md`, `tech-stack.md`, or
     `product-guidelines.md` produces a warning, not a halt. Status is a
     read-only report.
