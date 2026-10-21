@@ -309,9 +309,10 @@ The primary agent:
 6. Syncs the docs.
 7. Runs `conductor-review`.
 8. Applies review fixes, re-reviews, and runs the post-review doc sync.
-9. Archives the track and marks it complete, pushes, then opens a PR when
-   enabled. The archive move is part of the track branch, so the merged PR
-   carries it.
+9. Pushes the branch and opens a PR when enabled, then makes **one** completion
+   commit that archives the track, marks it complete, and records the PR URL.
+   The archive move is the PR's last commit, so the merged PR carries it.
+   Nothing commits after the merge.
 
 If `pr.watch_ci` is true in `conductor/workflow.md`, the agent then watches CI
 for up to `pr.watch_timeout_minutes` (default 15). When every check passes and

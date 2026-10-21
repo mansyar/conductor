@@ -319,9 +319,10 @@ Report every mismatch; never hide or auto-fix it:
 -   `[-]` track with a live track branch.
 -   An archived track whose directory still exists under
     `conductor/tracks/`.
--   A `[x]` track whose directory is still under `conductor/tracks/`; completion
-    archives it before the PR, so this means the completion commit is missing or
-    the project is on the legacy post-merge layout.
+-   A `[x]` track whose directory is still under `conductor/tracks/`; the
+    completion commit archives the track as the branch's last commit, so this
+    means the completion commit is missing or the project is on the legacy
+    post-merge layout.
 -   `metadata.archived_at` without a matching `archive_path`, or the reverse.
 -   An archived track with a live local branch.
 -   Duplicate track IDs or duplicate registry entries.

@@ -475,9 +475,11 @@ PR without it.
 
 ## 8. Complete, Archive, and Open a PR
 
-Archival happens **before** the PR is created. The completion commit moves the
-track into `conductor/archive/`, so merging the PR puts the archived track on the
-base branch. Nothing archives after the merge.
+Archival happens in **one commit at the end**. When a PR is enabled, the branch
+is pushed and the PR is opened first; the completion commit then moves the track
+into `conductor/archive/`, records the PR URL, and is the last commit on the
+branch. Merging the PR puts the archived track on the base branch. Nothing
+commits after the merge — cleanup only deletes branches.
 
 ### 8.1 Prepare the Completion State
 
@@ -493,7 +495,50 @@ Read `conductor-implement/assets/pr-template.md` and fill it from:
 `metadata.json`, `plan.md`, the phase evidence files, `review.md`, and the final
 diff. Write `conductor/tracks/<track-id>/pr.md`.
 
-### 8.3 Archive and Mark Complete
+### 8.3 Push and Open the PR
+
+1.  Detect a remote with `git remote`. If there is no remote, go to Section 8.4
+    with `pr_url: null` and `pr_state: null`; the completion commit is the
+    deliverable.
+2.  Push: `git push -u origin <branch>` (or `git push` when the upstream is
+    already set).
+3.  Read `pr.enabled`. If it is false, go to Section 8.4 with `pr_url: null` and
+    `pr_state: null`; the pushed branch is the deliverable.
+4.  If `pr.enabled` is true, use `pr.tool` from the Workflow Config. Default:
+    `gh`. Build the title `<type>(<scope>): <track title>` and use
+    `pr.base or base_branch` as the base.
+    -   **Existing PR:** inspect it with `gh pr view <branch>` (or
+        `gh pr list --head <branch>`).
+        -   `OPEN`: update the body with
+            `gh pr edit <url> --body-file conductor/tracks/<track-id>/pr.md`.
+        -   `MERGED`: continue to Section 8.4 with `pr_state: "merged"`.
+        -   `CLOSED`: stop and ask whether to reopen it or open a new PR. Do not
+            make the completion commit while the PR is closed and unmerged.
+    -   **Create:**
+        ```bash
+        gh pr create \
+          --base <pr.base or base_branch> \
+          --head <branch> \
+          --title "<type>(<scope>): <title>" \
+          --body-file conductor/tracks/<track-id>/pr.md
+        ```
+    -   **`glab`:** use the equivalent `glab mr create` and `glab mr view`/
+        `glab mr update` commands with the same source branch, target branch,
+        title, and body. Apply the same `OPEN`/`MERGED`/`CLOSED` handling.
+    -   **Other tool:** do not invent commands. Treat PR creation as
+        unavailable and continue to Section 8.4 with `pr_state:
+        "unavailable"`.
+5.  If the configured tool is missing, unauthenticated, or fails, treat PR
+    creation as unavailable and continue to Section 8.4 with
+    `pr_state: "unavailable"`. Give the user the host's compare URL:
+    -   GitHub:
+        `https://github.com/<owner>/<repo>/compare/<base>...<branch>?expand=1`
+    -   GitLab: the equivalent merge-request URL for the repository.
+
+### 8.4 Complete and Archive
+
+One commit finishes the track. It is the last commit on the branch; no commit is
+made after it, before or after the merge.
 
 1.  `git mv conductor/tracks/<track-id> conductor/archive/<track-id>`.
 2.  Update `conductor/tracks.md`: change `[~]` to `[x]` and rewrite the line's
@@ -503,60 +548,16 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
     -   `status: "complete"`
     -   `archived_at` and `archive_path: "conductor/archive/<track-id>"`
     -   `updated_at`
-    -   Leave `pr_url: null` and `pr_state: null`; Section 8.4 records them.
-4.  Stage the archive directory, `conductor/tracks.md`, and `metadata.json`.
-    Commit:
+    -   `pr_url`: the PR URL from Section 8.3, or `null` when there is no PR.
+    -   `pr_state`: `"open"` when the PR was created or updated, `"merged"`
+        when it was already merged, `"unavailable"` when creation was
+        configured but failed, or `null` when no PR is expected.
+4.  Stage the archive directory and `conductor/tracks.md`. Commit:
     `chore(conductor): Complete and archive track '<track-id>'`.
-
-### 8.4 Push, Create the PR, and Record It
-
-1.  Detect a remote with `git remote`. If there is no remote, skip push and PR
-    creation. The completion commit is the deliverable; `pr_url` and `pr_state`
-    stay `null`.
-2.  If a remote exists, push: `git push -u origin <branch>` (or `git push` when
-    the upstream is already set).
-3.  Read `pr.enabled`. If it is false, skip PR creation. Keep `pr_url: null` and
-    `pr_state: null`; the pushed branch is the deliverable.
-4.  If `pr.enabled` is true, use `pr.tool` from the Workflow Config. Default:
-    `gh`. Build the title `<type>(<scope>): <track title>` and use
-    `pr.base or base_branch` as the base.
-    -   **Existing PR:** inspect it with `gh pr view <branch>` (or
-        `gh pr list --head <branch>`).
-        -   `OPEN`: update the body with
-            `gh pr edit <url> --body-file conductor/archive/<track-id>/pr.md`.
-        -   `MERGED`: set `pr_state: "merged"` and continue to step 5.
-        -   `CLOSED`: stop and ask whether to reopen it or open a new PR. Do not
-            push the completion commit while the PR is closed and unmerged.
-    -   **Create:**
-        ```bash
-        gh pr create \
-          --base <pr.base or base_branch> \
-          --head <branch> \
-          --title "<type>(<scope>): <title>" \
-          --body-file conductor/archive/<track-id>/pr.md
-        ```
-    -   **`glab`:** use the equivalent `glab mr create` and `glab mr view`/
-        `glab mr update` commands with the same source branch, target branch,
-        title, and body. Apply the same `OPEN`/`MERGED`/`CLOSED` handling.
-    -   **Other tool:** do not invent commands. Push the branch, give the user
-        the host's compare URL, and treat PR creation as unavailable.
-5.  Record the PR in `conductor/archive/<track-id>/metadata.json`:
-    -   `pr_url`: the PR URL, or `null` when creation failed
-    -   `pr_state`: `"open"` when created or updated, `"merged"` when already
-        merged, `"unavailable"` when creation was configured but failed
-    -   `updated_at`
-    Commit `chore(conductor): Record PR for track '<track-id>'` and push.
-6.  If the configured tool is missing, unauthenticated, or fails: push, give the
-    user the compare URL, and record `pr_state: "unavailable"` with the
-    metadata-only commit from step 5.
-    -   GitHub:
-        `https://github.com/<owner>/<repo>/compare/<base>...<branch>?expand=1`
-    -   GitLab: the equivalent merge-request URL for the repository.
-7.  Every commit made after the PR is created must touch only `conductor/**`.
-    Cleanup relies on this to tell the PR recording commit apart from code
-    drift.
-8.  Do not poll for merge here. Section 8.5 watches only when `pr.watch_ci` is
-    true. Never merge the PR without an explicit confirmation.
+5.  Push when a remote exists. This commit must touch only `conductor/**`;
+    cleanup relies on that when it compares the branch tip with the PR head.
+6.  Do not poll for merge. Section 8.5 watches only when `pr.watch_ci` is true.
+    Never merge the PR without an explicit confirmation.
 
 ### 8.5 Watch CI and Offer a Merge
 
@@ -730,9 +731,10 @@ then `conductor/archive/<track-id>/metadata.json`.
 
     If the branch tip differs from the PR head, the branch advanced after the PR.
     Accept the difference only when every extra commit touches `conductor/**`
-    (`git diff --name-only <headRefOid>..<branch>`); those are the PR-recording
-    commits from Section 8.4. Any changed file outside `conductor/**` means real
-    drift: warn and leave the branch alone.
+    (`git diff --name-only <headRefOid>..<branch>`); the expected case is the
+    completion commit from Section 8.4, which archives the track after the PR
+    was opened. Any changed file outside `conductor/**` means real drift: warn
+    and leave the branch alone.
 
 4.  **Present the candidates:** one table with track ID, branch, PR, merge proof,
     archive location, and whether a remote branch exists. Candidate branches are
