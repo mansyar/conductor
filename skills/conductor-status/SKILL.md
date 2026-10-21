@@ -140,7 +140,9 @@ Include a concrete `Fix:` line for every warning or error.
     exist, report that the project is not using OpenCode subagents and continue.
 8.  **Tooling:** `git` is available; `python` or `python3` is available when
     setup scripts are used; when a remote and PR flow are enabled, the
-    configured `pr.tool` (`gh` or `glab`) is installed and authenticated.
+    configured `pr.tool` (`gh` or `glab`) is installed and authenticated. When
+    `pr.media` is not `never` and `pr.tool` is `gh`, report the GitHub CLI
+    version and whether it is 2.99.0 or later — media upload needs it.
 9.  **Runtime state:** `.conductor/runs/*.json` points to an existing branch and
     phase; a recorded checkpoint, when present, exists; completed and archived
     tracks have no `status: running` run file. Stale run files are warnings, not

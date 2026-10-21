@@ -6,9 +6,9 @@
 
 - **ID:** `<track-id>`
 - **Type:** `<type>`
-- **Spec:** [`conductor/tracks/<track-id>/spec.md`](conductor/tracks/<track-id>/spec.md)
-- **Plan:** [`conductor/tracks/<track-id>/plan.md`](conductor/tracks/<track-id>/plan.md)
-- **Review:** [`conductor/tracks/<track-id>/review.md`](conductor/tracks/<track-id>/review.md)
+- **Spec:** [`conductor/archive/<track-id>/spec.md`](conductor/archive/<track-id>/spec.md)
+- **Plan:** [`conductor/archive/<track-id>/plan.md`](conductor/archive/<track-id>/plan.md)
+- **Review:** [`conductor/archive/<track-id>/review.md`](conductor/archive/<track-id>/review.md)
 
 ## What happened
 
@@ -27,9 +27,18 @@
 
 | Layer | Command | Result | Evidence |
 | --- | --- | --- | --- |
-| unit | `<command>` | pass | `conductor/tracks/<track-id>/verification/integrated.md` |
+| unit | `<command>` | pass | `conductor/archive/<track-id>/verification/integrated.md` |
 | lint | `<command>` | pass | |
 | build | `<command>` | pass | |
+
+## Media
+
+<Optional. One line per visual: what it shows and the commit SHA it was
+captured at. Reference the captured file with a path relative to the repository
+root, for example
+`![Login error state](.conductor/media/<track-id>/login-error.png)`. The PR
+command uploads the file and rewrites the reference to a hosted URL. Leave this
+section out entirely when the track has no media.>
 
 ## Review
 

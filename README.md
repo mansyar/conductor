@@ -327,6 +327,16 @@ completion:
 /conductor:conductor-implement watch
 ```
 
+When a track changes what a user sees — UI, layout, charts, animation — the
+agent can include a visual demo in the PR body. `pr.media` in
+`conductor/workflow.md` decides: `ask` (default) asks once per visual track,
+`always` includes it, `never` skips it. The demo is captured with whatever the
+host provides (a browser tool, Playwright, or an installed Playwright CLI),
+kept in `.conductor/media/` and never committed, then attached to the PR body
+with `gh pr create --attach` — which needs GitHub CLI 2.99.0 or later and
+works on GitHub only. The PR body keeps the hosted URL, so it survives the
+branch deletion that follows the merge.
+
 If a phase is interrupted, run:
 
 ```bash

@@ -45,7 +45,7 @@ move the track through review to a pull request.
     -   `verification.retry`. Evidence paths are fixed:
         `conductor/tracks/<track-id>/verification/` and `.conductor/evidence/`.
     -   `review.strict`, `review.issues`
-    -   `pr.enabled`, `pr.tool`, `pr.base`
+    -   `pr.enabled`, `pr.tool`, `pr.base`, `pr.media`
 4.  **Load Style Guides:** List `conductor/code_styleguides/`. Pass the relevant
     guides to the phase subagent.
 
@@ -496,6 +496,33 @@ Read `conductor-implement/assets/pr-template.md` and fill it from:
 `metadata.json`, `plan.md`, the phase evidence files, `review.md`, and the final
 diff. Write `conductor/tracks/<track-id>/pr.md`.
 
+**Media (optional, visual tracks only):**
+
+1.  Read `pr.media` from the Workflow Config. `never` → skip this whole block.
+2.  Decide whether the track is visual: the spec, the plan, or the phase goals
+    mention UI, screen, layout, chart, animation, or a rendered result. A
+    non-visual track skips this block.
+3.  For a visual track: with `pr.media: "always"`, capture the demo without
+    asking. With `pr.media: "ask"`, ask once: "Include a visual demo in the PR
+    body?" **No** → skip the block and leave the `## Media` section out of
+    `pr.md`. **Yes** → continue.
+4.  Capture the demo with the tooling the host provides — a browser tool,
+    Playwright, or an installed Playwright CLI. Prefer a short GIF of the
+    affected flow; a single screenshot is enough for a static layout change.
+    -   Save it under `.conductor/media/<track-id>/`. Never commit media to the
+        repository: binary files on a long-lived branch bloat every future
+        clone.
+    -   Keep it small: at or below 10 MB, at most 10 fps, a few seconds long.
+        Prefer GIF over MP4 unless the user asks for video.
+    -   Capture against the branch under review, and note the commit SHA the
+        capture demonstrates.
+    -   When the host has no capture tooling, say so and skip the media. Never
+        fabricate an image and never reference a file that was not captured.
+5.  Reference the file in `pr.md` with a path relative to the repository root
+    and an alt text, for example
+    `![Login error state](.conductor/media/<track-id>/login-error.png)`.
+    Section 8.3 uploads it and rewrites the reference to a hosted URL.
+
 ### 8.3 Push and Open the PR
 
 1.  Detect a remote with `git remote`. If there is no remote, go to Section 8.4
@@ -508,10 +535,19 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
 4.  If `pr.enabled` is true, use `pr.tool` from the Workflow Config. Default:
     `gh`. Build the title `<type>(<scope>): <track title>` and use
     `pr.base or base_branch` as the base.
+    -   **Media (GitHub only):** when Section 8.2 captured media, the upload
+        needs `gh` 2.99.0 or later. Check `gh --version`.
+        -   Too old → tell the user to update GitHub CLI (`gh upgrade`, or
+            install from https://cli.github.com) and ask whether to create the
+            PR now without the media or to wait for the update. Never look for
+            another upload path.
+        -   `pr.tool` is not `gh` → skip the media and say so. Media upload is
+            GitHub-only.
     -   **Existing PR:** inspect it with `gh pr view <branch>` (or
         `gh pr list --head <branch>`).
         -   `OPEN`: update the body with
-            `gh pr edit <url> --body-file conductor/tracks/<track-id>/pr.md`.
+            `gh pr edit <url> --body-file conductor/tracks/<track-id>/pr.md`,
+            adding `--attach <media path>` when media was captured.
         -   `MERGED`: continue to Section 8.4 with `pr_state: "merged"`.
         -   `CLOSED`: stop and ask whether to reopen it or open a new PR. Do not
             make the completion commit while the PR is closed and unmerged.
@@ -521,20 +557,35 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
           --base <pr.base or base_branch> \
           --head <branch> \
           --title "<type>(<scope>): <title>" \
-          --body-file conductor/tracks/<track-id>/pr.md
+          --body-file conductor/tracks/<track-id>/pr.md \
+          --attach .conductor/media/<track-id>/<file>
         ```
+        Include `--attach` only when media was captured. Run the command from
+        the repository root: `--body-file` paths resolve against the body
+        file's directory and then the working directory, and the reference in
+        the body must match the `--attach` path.
     -   **`glab`:** use the equivalent `glab mr create` and `glab mr view`/
         `glab mr update` commands with the same source branch, target branch,
         title, and body. Apply the same `OPEN`/`MERGED`/`CLOSED` handling.
+        Media is not uploaded for `glab`.
     -   **Other tool:** do not invent commands. Treat PR creation as
         unavailable and continue to Section 8.4 with `pr_state:
         "unavailable"`.
-5.  If the configured tool is missing, unauthenticated, or fails, treat PR
+5.  Refresh the PR body file when a PR was created or updated: run
+    `gh pr view <url> --json body` and write the `body` value to
+    `conductor/tracks/<track-id>/pr.md` with the file write tool, not a shell
+    redirect. Do this whenever media was attached — `gh` rewrote the local path
+    into the hosted URL — so the archived body keeps working links.
+6.  If `gh` exits non-zero but prints a PR URL, the PR exists with the
+    attachments that succeeded. Report that, keep the PR URL, and continue.
+7.  If the configured tool is missing, unauthenticated, or fails, treat PR
     creation as unavailable and continue to Section 8.4 with
     `pr_state: "unavailable"`. Give the user the host's compare URL:
     -   GitHub:
         `https://github.com/<owner>/<repo>/compare/<base>...<branch>?expand=1`
     -   GitLab: the equivalent merge-request URL for the repository.
+8.  Do not poll for merge here. Section 8.5 watches only when `pr.watch_ci` is
+    true. Never merge the PR without an explicit confirmation.
 
 ### 8.4 Complete and Archive
 
