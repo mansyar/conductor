@@ -259,10 +259,11 @@ nothing behind.
         -   `depends_on` from the spec's track dependencies. If it is non-empty,
             resolve each dependency in `tracks.md`; if it is absent there, read
             `conductor/archive/<track-id>/metadata.json`. A dependency is
-            satisfied only when it is complete and its merge is proven
-            (`pr_state: "merged"`, `merged_at`, `merge_commit`, or an ancestor
-            check). Otherwise warn that this track cannot start until the
-            dependency lands.
+            satisfied only when its `metadata.status` is `complete` and its
+            merge is proven (`pr_state: "merged"`, or the dependency's merge
+            commit is an ancestor of the current base — verify live with the
+            configured `pr.tool` when in doubt). Otherwise warn that this track
+            cannot start until the dependency lands.
         -   `created_at` and `updated_at` (ISO-8601)
         -   `spec: "spec.md"`, `plan: "plan.md"`
         -   `branch`, `base_branch`, `base_sha`
@@ -270,8 +271,7 @@ nothing behind.
             approved plan (implementation phases only), with verified/done at `0`
         -   `last_checkpoint: null`, `review_verdict: null`, `review_rounds: 0`
         -   `doc_sync: "pending"`
-        -   `pr_url: null`, `pr_state: null`, `merged_at: null`,
-            `merge_commit: null`
+        -   `pr_url: null`, `pr_state: null`
         -   `reverted_at: null`, `revert_commit: null`, `revert_pr_url: null`
         -   `archived_at: null`, `archive_path: null`
     -   Write the approved `spec.md` and `plan.md`.

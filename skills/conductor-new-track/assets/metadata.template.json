@@ -24,8 +24,6 @@
   "doc_sync": "pending",
   "pr_url": null,
   "pr_state": null,
-  "merged_at": null,
-  "merge_commit": null,
   "reverted_at": null,
   "revert_commit": null,
   "revert_pr_url": null,

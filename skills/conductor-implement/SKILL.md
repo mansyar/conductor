@@ -164,8 +164,9 @@ Validate that:
     `conductor/tracks/<track-id>/` or, for `[x]` and `[-]` entries, from
     `conductor/archive/<track-id>/`. The dependency is satisfied
     only when `metadata.status` is `complete` and the merge is proven
-    (`pr_state: "merged"`, `merged_at`, `merge_commit`, or the archived base is
-    an ancestor of the current base). A `legacy`, `reverted`, or `abandoned`
+    (`pr_state: "merged"`, or the dependency's merge commit is an ancestor of
+    the current base — verify live with the configured `pr.tool`,
+    `gh pr view`, when in doubt). A `legacy`, `reverted`, or `abandoned`
     dependency is not satisfied.
 
 If a dependency is unmet, stop and explain which phase or track is blocking.
@@ -578,7 +579,10 @@ checks.
     and stop. Say plainly that watching stopped; do not imply CI failed and do
     not promise background monitoring.
 5.  If any check failed, report the failing check names and stop. Do not offer a
-    merge.
+    merge. The completion commit already exists, so do not add fix commits to
+    the archived track. A post-completion CI failure is handled outside this
+    flow: fix it on a new track or update the PR manually, then re-run
+    `implement watch`.
 6.  If every check passed, require all of:
     -   `mergeable: "MERGEABLE"`
     -   `isDraft: false`
