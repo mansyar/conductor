@@ -172,7 +172,16 @@ Check that:
     -   The applicable style guides.
     -   The check results and the requirements coverage table.
     -   The severity definitions and noise rules.
+    -   The tooling rule: a "permission denied" means the action is not
+        permitted for the reviewer. It must not retry, rephrase, or work around
+        it; it reports the exact command, why it needs it, and the result it
+        expects in `needs`, and the primary runs it.
 4.  Wait for its structured report. Do not let it edit files or create issues.
+5.  If the report contains a `needs` entry, run that exact command yourself —
+    the primary holds the project's permissions — then re-invoke the reviewer
+    once with the output. If the same command is denied again, ask the user
+    with the question tool, naming the exact command. Never work around a
+    denial on the reviewer's behalf.
 
 ### 4.1 Validate Findings
 

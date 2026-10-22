@@ -290,6 +290,12 @@ evidence paths; deviations; and notes.
   smallest necessary change and record it in deviations.
 - If a product or design decision is required, stop and report blocked.
 - Do not spawn subagents, ask the user questions, or use the web.
+- If a tool call returns "permission denied", the action is not permitted for
+  you. Do not retry, rephrase, or work around it (no pipes, no `&&` chains, no
+  wrapper binary, no Code Mode). Report the exact command, why you need it, and
+  the result you expect in `blockers`, and set status "blocked". The primary
+  runs it and hands the output back.
+- Prefer the native read, grep, and glob tools over shell equivalents.
 - Do not run git push, merge, rebase, reset, clean, switch, checkout, tag, or
   stash.
 - Commit task-level changes with conventional messages. Do not amend. Commit the
@@ -313,7 +319,9 @@ evidence paths; deviations; and notes.
     "evidence": "conductor/tracks/<track-id>/verification/phase-<n>.md"
   },
   "deviations": [{ "file": "src/example.ts", "reason": "..." }],
-  "blockers": [],
+  "blockers": [
+    { "command": "<exact command that was denied>", "why": "..." , "expected": "..." }
+  ],
   "notes": "..."
 }
 ```
@@ -334,6 +342,14 @@ evidence paths; deviations; and notes.
     "running"`, and `updated_at` immediately after launch.
 -   When the report arrives, set `status: "reported"`, store a short report
     summary in `last_report`, and update `updated_at` before verification.
+-   **Handle a permission-denied report:** when the report is `blocked` because
+    a tool call was denied, run the exact command yourself — the primary holds
+    the project's permissions — then re-invoke the subagent once with the
+    output appended to the brief. Resume the same session when the host
+    supports it; otherwise launch a fresh one. If the same command is denied
+    again, ask the user with the question tool, naming the exact command and
+    what you need from it. Never work around a denial on the subagent's
+    behalf.
 
 ### 4.7 Independent Verification
 

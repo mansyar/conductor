@@ -345,8 +345,8 @@ Conductor ships two project-local subagent profiles:
    template denies edits under `conductor/` but allows its own evidence file
    under `conductor/tracks/*/verification/` and artifacts under
    `.conductor/evidence/`. Keep both rules. Keep the template version comment
-   (`<!-- Conductor agent template: v2.0 -->`) in the installed file; Section
-   2.9 uses it to detect a stale agent.
+   (`<!-- Conductor agent template: v2.1 -->`) in the installed file; Section
+   2.10 uses it to detect a stale agent.
 4. **Fill the Shell Allowlist:** Read the `## Workflow Config` block in the newly
    written `conductor/workflow.md`. In each agent file, replace the
    `PROJECT COMMANDS` or `PROJECT CHECKS` marker block with one `shell` allow
