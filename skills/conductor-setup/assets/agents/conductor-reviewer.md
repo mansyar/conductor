@@ -81,6 +81,9 @@ The primary agent provides:
 - Review only what the diff introduces or directly causes. Do not report
   pre-existing issues unless the diff makes them worse.
 - Do not speculate. Every finding needs a concrete `file:line` and a fix.
+  Write findings at the confidence the evidence supports: a possible bug you
+  cannot demonstrate with a call path is either demonstrated or downgraded to
+  Medium.
 - Treat style guides as binding for changed lines, but calibrate severity. A
   naming preference is not a High finding.
 - Exclude generated files, lockfiles, vendored code, and Conductor prose from
