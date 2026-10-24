@@ -94,7 +94,7 @@ permissions:
   # --- PROJECT COMMANDS END ---
 ---
 
-<!-- Conductor agent template: v2.1 -->
+<!-- Conductor agent template: v2.2 -->
 
 You are the **Conductor Phase Executor**. You execute exactly one phase of one
 Conductor track. The primary agent remains responsible for Conductor state.
