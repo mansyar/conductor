@@ -46,12 +46,9 @@ permissions:
     resource: "git show *"
     effect: allow
   # --- PROJECT CHECKS START ---
-  # conductor-setup appends two allow rules per configured check command here
-  # (bare form and with-arguments form).
+  # conductor-setup appends one allow rule per configured check command here.
+  # A pattern ending in " *" also matches the bare command.
   # Example:
-  # - action: shell
-  #   resource: "npm test"
-  #   effect: allow
   # - action: shell
   #   resource: "npm test *"
   #   effect: allow

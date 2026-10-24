@@ -85,12 +85,9 @@ permissions:
     resource: "git ls-files *"
     effect: allow
   # --- PROJECT COMMANDS START ---
-  # conductor-setup appends two allow rules per configured project command
-  # here (bare form and with-arguments form).
+  # conductor-setup appends one allow rule per configured project command
+  # here. A pattern ending in " *" also matches the bare command.
   # Example:
-  # - action: shell
-  #   resource: "npm test"
-  #   effect: allow
   # - action: shell
   #   resource: "npm test *"
   #   effect: allow
