@@ -66,8 +66,8 @@ tracks.
     -   List the up to three most relevant in-progress or verified phases.
     -   If there are no in-progress tracks, list the three most recent `[x]`
       tracks that can be reverted after merge.
-    -   Present one **single-choice question** with at most four options.
-3.  Confirm the target with a **Yes/No question**.
+    -   Present one **single-choice question** via the question tool with at most four options.
+3.  Confirm the target with a **Yes/No question** via the question tool.
 4.  Ignore `[-]` tracks (already reverted or abandoned) unless the user explicitly
     asks to inspect one.
 
@@ -78,7 +78,7 @@ tracks.
 ### 3.1 Worktree
 
 Run `git status --porcelain`. Ignore `.conductor/`. If any other file is dirty,
-stop and ask the user to commit or stash it. A revert must start from a clean
+stop and ask the user via the question tool to commit or stash it. A revert must start from a clean
 tree.
 
 ### 3.2 Determine the Track State
@@ -108,7 +108,7 @@ tree.
 3.  The phase must be `verified`. An `in_progress` phase is not reverted here;
     rework it through implement or abandon the track.
 4.  The phase must have a `Checkpoint` in `plan.md`. If it is missing, stop and
-    ask the user to repair the plan or identify the phase commit. Do not infer
+    ask the user via the question tool to repair the plan or identify the phase commit. Do not infer
     the phase commit from a later checkpoint.
 5.  The checkpoint commit must exist:
     `git cat-file -e <sha>^{commit}`.
@@ -126,14 +126,13 @@ tree.
     spec or plan. For a merged track, restore the old artifacts from the base and
     mark the registry `[-]`. For an unmerged track, delete the branch after
     confirmation.
--   **Unmerged:** confirm the branch is not merged. If a PR is open, confirm
-    whether to close it.
+-   **Unmerged:** confirm via the question tool that the branch is not merged. If a PR is open, confirm via the question tool whether to close it.
 -   **Merged:** find the merge or squash commit:
     1.  Query the configured `pr.tool` for the merge commit (`gh pr view
         <pr_url> --json mergeCommit` for GitHub) when available.
     2.  `git log --oneline --merges --grep "<track-id>" <base>`.
     3.  `git log --oneline <base> --grep "<track title>"`.
-    4.  Ask the user to confirm the commit. Do not revert an ambiguous commit.
+    4.  Ask the user to confirm the commit via the question tool. Do not revert an ambiguous commit.
 -   If the commit is a merge, plan `git revert -m 1 <sha>`. If it is a squash,
     plan `git revert <sha>`. If the PR was rebased or fast-forwarded, there is no
     single merge commit; plan the PR's commits newest first (from the configured
@@ -158,7 +157,7 @@ Revert plan
 - Verification: <commands>
 ```
 
-Ask for confirmation with **Proceed**, **Revise**, or **Cancel**.
+Ask for confirmation via the question tool with **Proceed**, **Revise**, or **Cancel**.
 
 ---
 
@@ -265,8 +264,8 @@ Record the choice in the metadata notes or the revert record.
 
 Use branch deletion, not `git revert`.
 
-1.  Confirm the branch is unmerged.
-2.  If a PR is open, ask:
+1.  Confirm via the question tool that the branch is unmerged.
+2.  If a PR is open, ask via the question tool:
     -   **Close PR and delete the branch (Recommended).**
     -   **Close PR only** — keep the branch for audit.
 3.  If the choice is **Close PR and delete the branch**:
@@ -321,7 +320,7 @@ Use a reviewed revert PR.
     -   If `conductor/tracks/<track-id>/` exists on the base (legacy post-merge
         layout, or a track abandoned before completion), restore it in place
         together with `conductor/tracks.md`. Do not archive it here.
-    -   If both paths exist, stop and ask the user which copy is canonical. Do
+    -   If both paths exist, stop and ask the user via the question tool which copy is canonical. Do
         not merge the two directories.
     -   If neither exists on the base, stop. Do not invent a track directory.
     -   If `conductor/tracks.md` has no line for the track, add one with a link
@@ -437,3 +436,7 @@ Report:
 -   Never move a track into or out of the archive here, and never permanently
     delete one.
 -   Never mark a reverted track `[x]`. The registry marker is `[-]`.
+-   Never ask the user a decision question in plain text. Every confirmation in
+    Sections 2 through 6 goes through the native `question` tool on hosts that
+    provide one; pure status updates stay as text. On hosts without the tool,
+    use numbered text options, one question at a time.

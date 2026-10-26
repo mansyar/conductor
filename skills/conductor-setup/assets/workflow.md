@@ -208,7 +208,7 @@ report itself is committed with the track.
 2. If a service is missing, start it with the documented command.
 3. If it still cannot run, run the narrowest reliable subset and mark the phase
    `partial` with the reason.
-4. Stop and ask the user only for credentials, hardware, or an external
+4. Stop and ask the user (via the question tool) only for credentials, hardware, or an external
    approval.
 
 ### Retry Policy

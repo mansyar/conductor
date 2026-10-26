@@ -17,7 +17,7 @@ move the track through review to a pull request.
 -   **Precise Execution:** Do not skip steps. Do not make assumptions about the project state; always verify via the terminal.
 -   **Tool Validation:** You MUST validate the success of every tool call. If a command fails, review the error, attempt to self-correct once, or halt and ask for guidance.
 -   **Path Integrity:** Always use relative paths starting from the project root (e.g., `conductor/tracks.md`).
--   **Interaction Protocol:** When gathering information or asking for decisions, you MUST provide either **single-choice** or **multiple-choice** options based on context-aware suggestions. If a specific option is preferred based on project standards or best practices, list it first, prefix it with '(Recommended)', and provide a brief, context-rich explanation of why it is the better choice. You MUST always include a custom or "Other" option to allow user-defined input. Avoid asking raw, open-ended questions without suggestions. When the host provides a native question tool (OpenCode), PREFER it for structured choices and confirmations, and batch independent questions into one call.
+-   **Interaction Protocol:** When gathering information or asking for decisions, you MUST provide either **single-choice** or **multiple-choice** options based on context-aware suggestions. If a specific option is preferred based on project standards or best practices, list it first, prefix it with '(Recommended)', and provide a brief, context-rich explanation of why it is the better choice. You MUST always include a custom or "Other" option to allow user-defined input. Avoid asking raw, open-ended questions without suggestions. When the host provides a native question tool (OpenCode), every question that needs a choice, confirmation, or approval MUST go through it; batch independent questions into one call. Pure status updates stay as text. Never ask a decision question in plain text. On hosts without the tool, fall back to numbered text options, one question at a time.
 -   **Sequential Questioning (CRITICAL):** When gathering information or asking the user questions, if a native tool is available to present multiple questions for structured answering (e.g., a modal or form tool), you may use it to group questions. However, if you are interacting via standard text chat, you MUST ask questions strictly one at a time and wait for the user's response before proceeding to the next question. Do NOT output multiple questions in a single chat response.
 -   **State Ownership:** Only you write `plan.md`, `tracks.md`, `metadata.json`, `conductor/index.md`, `review.md`, and `pr.md`. Phase subagents write code, tests, and their own evidence file.
 
@@ -86,7 +86,7 @@ move the track through review to a pull request.
     -   If no track is available, announce that there is nothing to implement and
         HALT.
 4.  **Confirm:** Show the track ID, title, branch, and current phase. Ask for
-    confirmation with a **Yes/No question** when the selection was inferred.
+    confirmation with a **Yes/No question** via the question tool when the selection was inferred.
 5.  **Read `metadata.json`:** Require `id`, `type`, `status`, `branch`,
     `base_branch`, and `base_sha`. `base_sha` may be `null` only when the
     repository has no commits. If `branch` is missing, this is a legacy track;
@@ -105,7 +105,7 @@ move the track through review to a pull request.
 ### 3.1 Worktree
 
 Run `git status --porcelain`. Ignore `.conductor/` and generated evidence
-artifacts. If any other file is modified, stop and ask the user to commit or
+artifacts. If any other file is modified, stop and ask the user via the question tool to commit or
 stash it. Do not start a phase on top of unrelated work.
 
 ### 3.2 Branch
@@ -159,7 +159,7 @@ Validate that:
     Sub-tasks inherit the parent's `covers:`.
 -   Every `AC` in the spec is covered by at least one phase.
 -   Every `FR` and `NFR` has at least one phase that covers it.
--   If the plan is invalid, stop and ask the user to repair it or re-run
+-   If the plan is invalid, stop and ask the user via the question tool to repair it or re-run
     `conductor-new-track`.
 
 ### 4.2 Dependency Check
@@ -187,7 +187,7 @@ If a dependency is unmet, stop and explain which phase or track is blocking.
     and its sub-tasks.
     -   If the phase is still `pending`, run Section 4.4 first so the phase is
         `in_progress`, `phase_base` is recorded, and the run file exists. If the
-        phase is `verified`, require an explicit redo confirmation before
+        phase is `verified`, require an explicit redo confirmation via the question tool before
         resetting it.
     -   Verify the task with the configured command(s).
     -   Mark the task `[x]`, update `metadata.progress.tasks_done` and
@@ -432,7 +432,7 @@ If any check fails, go to Section 4.9.
     phase.
 -   **Blocked:** If the phase needs credentials, hardware, or an external
     approval, set `**Status:** blocked`, write the blocker, set the run file to
-    `status: "blocked"`, commit the state, and ask the user. Do not mark it
+    `status: "blocked"`, commit the state, and ask the user via the question tool. Do not mark it
     verified.
 
 ---
@@ -607,7 +607,7 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
         `https://github.com/<owner>/<repo>/compare/<base>...<branch>?expand=1`
     -   GitLab: the equivalent merge-request URL for the repository.
 8.  Do not poll for merge here. Section 8.5 watches only when `pr.watch_ci` is
-    true. Never merge the PR without an explicit confirmation.
+    true. Never merge the PR without an explicit confirmation asked via the question tool.
 
 ### 8.4 Complete and Archive
 
@@ -631,7 +631,7 @@ made after it, before or after the merge.
 5.  Push when a remote exists. This commit must touch only `conductor/**`;
     cleanup relies on that when it compares the branch tip with the PR head.
 6.  Do not poll for merge. Section 8.5 watches only when `pr.watch_ci` is true.
-    Never merge the PR without an explicit confirmation.
+    Never merge the PR without an explicit confirmation asked via the question tool.
 
 ### 8.5 Watch CI and Offer a Merge
 
@@ -740,7 +740,7 @@ uncommitted work without explicit confirmation.
     -   Phase `in_progress` without a run file → rebuild the brief and resume.
     -   Phase `verified` but metadata or evidence disagrees → reconcile.
     -   Run file points at a different phase or a completed track → stale.
-    -   Uncommitted code changes → stop and ask the user to commit or stash.
+    -   Uncommitted code changes → stop and ask the user via the question tool to commit or stash.
 5.  Present the options that apply:
     -   **Verify Reported Work (Recommended when reported):** run Section 4.7.
     -   **Resume:** continue the phase.
@@ -764,7 +764,7 @@ uncommitted work without explicit confirmation.
         guess. Commit `conductor(plan): Reconcile state for phase '<name>'`.
     -   **Keep:** stop and list the exact paths that need attention.
     -   **Clean:** remove the run file only when no phase is `in_progress` and
-        the user confirms no subagent is active.
+        the user confirms via the question tool that no subagent is active.
 7.  Never run `git reset --hard`, `git clean`, or `git checkout -- .`. Never
     delete uncommitted work. If the branch is dirty, stop.
 
@@ -779,7 +779,7 @@ then `conductor/archive/<track-id>/metadata.json`.
 
 1.  **Preflight:** Require a clean tree. No particular branch is required.
     -   `git status --porcelain`, ignoring `.conductor/`. If anything else is
-        dirty, stop and ask the user to commit or stash it.
+        dirty, stop and ask the user via the question tool to commit or stash it.
     -   Fetch the base when a remote exists and `git.fetch` is true.
     -   If the current branch is a track or revert branch, Step 5 handles it;
         do not demand a base checkout.
@@ -793,7 +793,7 @@ then `conductor/archive/<track-id>/metadata.json`.
     ```
 
     For `glab`, use the equivalent merge-request view command. Keep the result
-    in memory. Do not write metadata unless the user confirms cleanup. If the
+    in memory. Do not write metadata unless the user confirms cleanup via the question tool. If the
     configured tool is missing or unauthenticated, mark the state unknown and
     use local proof only.
 
@@ -803,7 +803,7 @@ then `conductor/archive/<track-id>/metadata.json`.
     -   **Local merge or fast-forward:** the branch has no PR, but
         `git merge-base --is-ancestor <branch> <base>` succeeds.
     -   **Squash or rebase with no PR proof:** do not guess. Show
-        `git log <base> --grep "<track-id>"` and ask the user to confirm. Never
+        `git log <base> --grep "<track-id>"` and ask the user to confirm via the question tool. Never
         delete a branch on a guess.
 
     If the branch tip differs from the PR head, the branch advanced after the PR.
@@ -847,7 +847,7 @@ then `conductor/archive/<track-id>/metadata.json`.
         worktree, locate it with `git worktree list`. If it is not the main
         worktree, detach its HEAD with `git -C <path> checkout --detach` and
         retry the deletion. Never use `--force` there and never delete the
-        worktree directory. If it is the main worktree, stop and ask the user
+        worktree directory. If it is the main worktree, stop and ask the user via the question tool
         to switch it to another branch first.
     -   Never delete an unmerged branch, a branch whose non-`conductor/**`
         commits are newer than the PR head, or a branch belonging to a dirty
@@ -900,6 +900,10 @@ Wait for PR checks and offer a merge without redoing completion.
 -   Do not push or open a PR before review and post-review doc sync.
 -   Do not delete a branch without proven merge.
 -   Do not merge a PR without an explicit confirmation from the user.
+-   Never ask the user a decision question in plain text. Every question that
+    needs a choice, confirmation, or approval goes through the native
+    `question` tool on hosts that provide one; pure status updates stay as
+    text.
 -   Do not use `--admin`, `--auto`, or `--delete-branch` when merging.
 -   Do not use `git branch -D` without PR-merged proof and confirmation.
 -   Do not permanently delete an archived track or purge history.
