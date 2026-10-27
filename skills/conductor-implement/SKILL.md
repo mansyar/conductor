@@ -20,6 +20,7 @@ move the track through review to a pull request.
 -   **Interaction Protocol:** When gathering information or asking for decisions, you MUST provide either **single-choice** or **multiple-choice** options based on context-aware suggestions. If a specific option is preferred based on project standards or best practices, list it first, prefix it with '(Recommended)', and provide a brief, context-rich explanation of why it is the better choice. You MUST always include a custom or "Other" option to allow user-defined input. Avoid asking raw, open-ended questions without suggestions. When the host provides a native question tool (OpenCode), every question that needs a choice, confirmation, or approval MUST go through it; batch independent questions into one call. Pure status updates stay as text. Never ask a decision question in plain text. On hosts without the tool, fall back to numbered text options, one question at a time.
 -   **Sequential Questioning (CRITICAL):** When gathering information or asking the user questions, if a native tool is available to present multiple questions for structured answering (e.g., a modal or form tool), you may use it to group questions. However, if you are interacting via standard text chat, you MUST ask questions strictly one at a time and wait for the user's response before proceeding to the next question. Do NOT output multiple questions in a single chat response.
 -   **State Ownership:** Only you write `plan.md`, `tracks.md`, `metadata.json`, `conductor/index.md`, `review.md`, and `pr.md`. Phase subagents write code, tests, and their own evidence file.
+-   **Execution Posture (CRITICAL):** Execute the flow autonomously from the selected track to the pull request. Phase boundaries, review invocation, fix rounds, and PR creation are agent actions, not handoffs: never end a turn to ask "shall I continue?", "ready for review?", or "shall I open the PR?". Announce progress as text statements in the same turn the work continues ("Phase 2 verified, proceeding to Phase 3"). Stop for the user ONLY where the skill explicitly names the question tool; any step without that marking is executed without asking. Stop and report without a question on defined failures: a BLOCK verdict with unresolved blockers after the allowed rounds, unresolvable conflicts, missing authentication, or a closed-and-unmerged PR.
 
 ---
 
@@ -904,6 +905,7 @@ Wait for PR checks and offer a merge without redoing completion.
     needs a choice, confirmation, or approval goes through the native
     `question` tool on hosts that provide one; pure status updates stay as
     text.
+-   Do not pause between phases, before review, or before the PR to ask whether to continue. The only user stops are the steps that name the `question` tool; everything else proceeds autonomously, and defined failures stop with a report, not a question.
 -   Do not use `--admin`, `--auto`, or `--delete-branch` when merging.
 -   Do not use `git branch -D` without PR-merged proof and confirmation.
 -   Do not permanently delete an archived track or purge history.
