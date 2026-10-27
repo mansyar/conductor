@@ -626,7 +626,11 @@ made after it, before or after the merge.
     -   `pr_url`: the PR URL from Section 8.3, or `null` when there is no PR.
     -   `pr_state`: `"open"` when the PR was created or updated, `"merged"`
         when it was already merged, `"unavailable"` when creation was
-        configured but failed, or `null` when no PR is expected.
+        configured but failed, or `null` when no PR is expected. This field
+        is write-once: record the state at completion time and never amend
+        this file after the merge (`merged_at` and `merge_commit` stay null
+        by design). Merge state after completion is always verified live
+        via `pr_url`; do not add a post-merge commit to update these fields.
 4.  Stage the archive directory and `conductor/tracks.md`. Commit:
     `chore(conductor): Complete and archive track '<track-id>'`.
 5.  Push when a remote exists. This commit must touch only `conductor/**`;
