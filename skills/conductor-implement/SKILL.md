@@ -667,7 +667,10 @@ checks.
     review, branch protection, or a draft state.
 7.  Ask one single-choice question: **Merge now** (Recommended), **Leave open**,
     **Stop**. Use the native question tool on OpenCode; otherwise numbered text
-    options, one question at a time.
+    options, one question at a time. State the order in the question so the
+    sequence is explicit: the track is already archived in the completion
+    commit and pushed; merging the PR is the second and final step, after
+    which the branch is deleted locally and on the remote.
 8.  On **Merge now**, merge with the configured method and without deleting
     branches:
     ```bash
