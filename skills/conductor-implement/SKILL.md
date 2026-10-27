@@ -628,9 +628,9 @@ made after it, before or after the merge.
         when it was already merged, `"unavailable"` when creation was
         configured but failed, or `null` when no PR is expected. This field
         is write-once: record the state at completion time and never amend
-        this file after the merge (`merged_at` and `merge_commit` stay null
-        by design). Merge state after completion is always verified live
-        via `pr_url`; do not add a post-merge commit to update these fields.
+        this file after the merge. Merge state after completion is always
+        verified live via `pr_url`; do not add a post-merge commit to update
+        this field.
 4.  Stage the archive directory and `conductor/tracks.md`. Commit:
     `chore(conductor): Complete and archive track '<track-id>'`.
 5.  Push when a remote exists. This commit must touch only `conductor/**`;
