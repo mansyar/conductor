@@ -1,4 +1,4 @@
-import { For, Show, createResource, createSignal } from "solid-js"
+import { For, Show, createEffect, createResource, createSignal } from "solid-js"
 import { usePlugin } from "@opencode/plugin/gui"
 import { ConductorRpc } from "../rpc.js"
 import type { definition } from "./definition"
@@ -232,9 +232,30 @@ function dot(state: string): string {
 
 export function TracksView(props: { directory: string; server: string }) {
   const ctx = usePlugin<typeof definition>()
-  const [tracks, { refetch }] = createResource(() => props.directory, (dir) =>
-    fetchTracks(ctx, dir),
-  )
+  const [tracks, setTracks] = createSignal<TrackList | null>(null)
+  const [failed, setFailed] = createSignal(false)
+  const [loading, setLoading] = createSignal(false)
+
+  // Ref identity is stable across identical payloads: Solid's <For> tracks
+  // rows by reference, so a fresh object tree on every refresh would
+  // re-render all rows (and flash the window) even when nothing changed.
+  const load = async (directory: string) => {
+    setLoading(true)
+    try {
+      const fresh = await fetchTracks(ctx, directory)
+      setTracks((prev) => (JSON.stringify(prev) === JSON.stringify(fresh) ? prev : fresh))
+      setFailed(false)
+    } catch {
+      setFailed(true)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  createEffect(() => {
+    setTracks(null)
+    load(props.directory)
+  })
   const [selected, setSelected] = createSignal<string | null>(null)
   const [showArchived, setShowArchived] = createSignal(false)
   const [detail] = createResource(selected, async (id) => {
@@ -340,9 +361,9 @@ export function TracksView(props: { directory: string; server: string }) {
         </span>
         <span style={{ flex: "1" }} />
         <button
-          style={{ ...iconButton, opacity: tracks.loading ? "0.4" : "0.75" }}
+          style={{ ...iconButton, opacity: loading() ? "0.4" : "0.75" }}
           onClick={() => {
-            if (!tracks.loading) refetch()
+            if (!loading()) load(props.directory)
           }}
           title={ctx.t("panel.refresh")}
         >
@@ -350,13 +371,13 @@ export function TracksView(props: { directory: string; server: string }) {
         </button>
       </div>
 
-      <Show when={tracks.loading && !tracks()}>
+      <Show when={loading() && !tracks()}>
         <ui.Loader size="large" />
       </Show>
-      <Show when={tracks.error}>
+      <Show when={failed()}>
         <p style={meta}>{ctx.t("panel.error")}</p>
       </Show>
-      <Show when={!tracks.loading && list().length === 0}>
+      <Show when={!loading() && list().length === 0}>
         <p style={meta}>{ctx.t("panel.empty")}</p>
       </Show>
       <Show when={(tracks()?.skipped ?? 0) > 0}>
