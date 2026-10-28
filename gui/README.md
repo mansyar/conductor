@@ -1,13 +1,25 @@
-# conductor-gui (spike, read-only)
+# conductor-gui (phase 2: live data)
 
-OpenCode Desktop GUI plugin for Conductor: a tracks side panel and a composer
-pill for the active track. Built on the experimental `gui-experimental` API —
-expect maintenance when the SDK stabilizes.
+OpenCode Desktop GUI plugin for Conductor: a pinned tracks side panel and a
+composer pill for the active track. Built on the experimental `gui-experimental`
+API — expect maintenance when the SDK stabilizes.
 
 ## Status
 
-Scaffold with static preview data (`src/stub.ts`). The panel renders, the pill
-renders, the command toggles the panel. No live data yet.
+Live data over RPC. `listTracks` reads `conductor/tracks.md`, resolves each
+entry's `metadata.json` from `conductor/tracks/<id>/` then
+`conductor/archive/<id>/`, and matches the active track against
+`git branch --show-current`. `trackDetail` parses `plan.md` phases and runs
+`gh pr view` on demand for PR state plus check counts. `src/stub.ts` is deleted.
+
+## Access
+
+- The **Conductor** tab is pinned in the session side region: always listed,
+  never closed or dragged away.
+- The side panel **+** menu has a "Conductor tracks" launcher.
+- The `Conductor: Show tracks` command toggles the tab.
+- The composer pill shows the active track (`<id> · P<verified>/<total>`)
+  and opens the tab on click.
 
 ## Guardrails (non-negotiable)
 
