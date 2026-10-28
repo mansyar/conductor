@@ -33,7 +33,8 @@ counts. `src/stub.ts` is deleted.
 2. No session driving — only `layout.draft` (the user reviews and sends).
 3. State derivation mirrors the skills (markers, archive-is-storage,
    `[x]`-keeps-line). Divergence is a plugin bug, never fixed by writing metadata.
-4. `listTracks` stays local-only (files + `git branch --show-current`); the only
+4. `listTracks` and `worktrees` stay local-only (files + `git branch
+   --show-current` + `git worktree list --porcelain`); the only
    network call is `trackDetail`'s PR lookup, on demand.
 
 ## Build

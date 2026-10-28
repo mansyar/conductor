@@ -96,6 +96,59 @@ export const ConductorRpc = Rpc.define({
         additionalProperties: false,
       },
     },
+    worktrees: {
+      input: {
+        type: "object",
+        properties: { directory: { type: "string" } },
+        required: ["directory"],
+        additionalProperties: false,
+      },
+      output: {
+        type: "object",
+        properties: {
+          worktrees: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: {
+                path: { type: "string" },
+                branch: { type: ["string", "null"] },
+                detached: { type: "boolean" },
+                active: {
+                  type: ["object", "null"],
+                  properties: {
+                    activeId: { type: "string" },
+                    state: { type: "string" },
+                    progress: {
+                      type: "object",
+                      properties: {
+                        phases_total: { type: "number" },
+                        phases_verified: { type: "number" },
+                        tasks_total: { type: "number" },
+                        tasks_done: { type: "number" },
+                      },
+                      required: [
+                        "phases_total",
+                        "phases_verified",
+                        "tasks_total",
+                        "tasks_done",
+                      ],
+                      additionalProperties: false,
+                    },
+                  },
+                  required: ["activeId", "state", "progress"],
+                  additionalProperties: false,
+                },
+              },
+              required: ["path", "branch", "detached", "active"],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ["worktrees"],
+        additionalProperties: false,
+      },
+    },
     trackDetail: {      input: {
         type: "object",
         properties: {

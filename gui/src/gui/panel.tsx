@@ -75,6 +75,30 @@ async function fetchTracks(ctx: TrackContext, directory: string): Promise<TrackL
     : { initialized: false, activeId: null, tracks: [], skipped: 0 }
 }
 
+interface Sibling {
+  path: string
+  branch: string | null
+  detached: boolean
+  active: {
+    activeId: string
+    state: string
+    progress: Progress
+  } | null
+}
+
+async function fetchSiblings(ctx: TrackContext, directory: string): Promise<Sibling[]> {
+  try {
+    const result = (await ctx.client.rpc(ConductorRpc).worktrees({ directory })) as unknown as {
+      worktrees: Sibling[]
+    }
+
+    return result.worktrees ?? []
+  } catch {
+    // Older or unreachable server: Elsewhere simply stays empty.
+    return []
+  }
+}
+
 type TrackContext = ReturnType<typeof usePlugin<typeof definition>>
 
 const container: Record<string, string> = {
@@ -233,17 +257,21 @@ function dot(state: string): string {
 export function TracksView(props: { directory: string; server: string }) {
   const ctx = usePlugin<typeof definition>()
   const [tracks, setTracks] = createSignal<TrackList | null>(null)
+  const [siblings, setSiblings] = createSignal<Sibling[]>([])
   const [failed, setFailed] = createSignal(false)
   const [loading, setLoading] = createSignal(false)
 
   // Ref identity is stable across identical payloads: Solid's <For> tracks
   // rows by reference, so a fresh object tree on every refresh would
   // re-render all rows (and flash the window) even when nothing changed.
+  // The same rule applies to sibling worktrees below.
   const load = async (directory: string) => {
     setLoading(true)
     try {
       const fresh = await fetchTracks(ctx, directory)
       setTracks((prev) => (JSON.stringify(prev) === JSON.stringify(fresh) ? prev : fresh))
+      const sib = await fetchSiblings(ctx, directory)
+      setSiblings((prev) => (JSON.stringify(prev) === JSON.stringify(sib) ? prev : sib))
       setFailed(false)
     } catch {
       setFailed(true)
@@ -254,12 +282,19 @@ export function TracksView(props: { directory: string; server: string }) {
 
   createEffect(() => {
     setTracks(null)
-    setSelected(null)
+    setSiblings([])
+    setDetailKey(null)
     setDetailCache({})
     setDetailPending(null)
     load(props.directory)
   })
-  const [selected, setSelected] = createSignal<string | null>(null)
+  // Open detail is keyed by `dir::id`: the same track id can hold different
+  // content in different worktree checkouts.
+  const [detailKey, setDetailKey] = createSignal<string | null>(null)
+  const select = (id: string, dir: string) => {
+    const key = `${dir}::${id}`
+    setDetailKey((prev) => (prev === key ? null : key))
+  }
   const [showArchived, setShowArchived] = createSignal(false)
   const [query, setQuery] = createSignal("")
   const [mode, setMode] = createSignal<"all" | "live" | "archived">("all")
@@ -270,11 +305,15 @@ export function TracksView(props: { directory: string; server: string }) {
   const [detailPending, setDetailPending] = createSignal<string | null>(null)
 
   createEffect(() => {
-    const dir = props.directory
-    const id = selected()
+    const key = detailKey()
 
-    if (!id || detailCache()[id] || detailPending() === id) return
-    setDetailPending(id)
+    if (!key) return
+    const sep = key.indexOf("::")
+    const dir = key.slice(0, sep)
+    const id = key.slice(sep + 2)
+
+    if (detailCache()[key] || detailPending() === key) return
+    setDetailPending(key)
     ctx.client
       .rpc(ConductorRpc)
       .trackDetail({ directory: dir, id })
@@ -283,14 +322,14 @@ export function TracksView(props: { directory: string; server: string }) {
 
         if (d && d.found) {
           setDetailCache((prev) => {
-            const next = { ...prev, [id]: d }
-            return JSON.stringify(prev[id]) === JSON.stringify(d) ? prev : next
+            const next = { ...prev, [key]: d }
+            return JSON.stringify(prev[key]) === JSON.stringify(d) ? prev : next
           })
         }
       })
       .catch(() => {})
       .finally(() => {
-        setDetailPending((cur) => (cur === id ? null : cur))
+        setDetailPending((cur) => (cur === key ? null : cur))
       })
   })
 
@@ -359,21 +398,21 @@ export function TracksView(props: { directory: string; server: string }) {
           {ctx.t("panel.watch")}
         </button>
       </Show>
-      <button
-        style={ghostButton}
-        onClick={() => setSelected((id) => (id === t.id ? null : t.id))}
-      >
+      <button style={ghostButton} onClick={() => select(t.id, props.directory)}>
         {ctx.t("panel.detail")}
       </button>
     </div>
   )
 
-  const detailView = (t: Track) => (
-    <Show when={selected() === t.id}>
-      <Show
-        when={detailCache()[t.id]}
-        fallback={
-          <Show when={detailPending() === t.id}>
+  const detailView = (id: string, dir: string) => {
+    const key = `${dir}::${id}`
+
+    return (
+      <Show when={detailKey() === key}>
+        <Show
+          when={detailCache()[key]}
+          fallback={
+            <Show when={detailPending() === key}>
             <div style={detailBox}>
               <span style={meta}>{ctx.t("panel.detailLoading")}</span>
             </div>
@@ -410,9 +449,10 @@ export function TracksView(props: { directory: string; server: string }) {
             </Show>
           </div>
         )}
+        </Show>
       </Show>
-    </Show>
-  )
+    )
+  }
 
   const ui = ctx.ui
   return (
@@ -533,7 +573,7 @@ export function TracksView(props: { directory: string; server: string }) {
             </Show>
             <div style={{ ...meta, opacity: "0.85" }}>{t().nextAction}</div>
             {buttons(t(), true)}
-            {detailView(t())}
+            {detailView(t().id, props.directory)}
           </div>
         )}
       </Show>
@@ -561,7 +601,7 @@ export function TracksView(props: { directory: string; server: string }) {
                 <span>{t.nextAction}</span>
               </div>
               {buttons(t, false)}
-              {detailView(t)}
+              {detailView(t.id, props.directory)}
             </div>
           )}
         </For>
@@ -598,7 +638,7 @@ export function TracksView(props: { directory: string; server: string }) {
                 <div style={actions}>
                   <button
                     style={ghostButton}
-                    onClick={() => setSelected((id) => (id === t.id ? null : t.id))}
+                    onClick={() => select(t.id, props.directory)}
                   >
                     {ctx.t("panel.detail")}
                   </button>
@@ -608,11 +648,78 @@ export function TracksView(props: { directory: string; server: string }) {
                     </button>
                   </Show>
                 </div>
-                {detailView(t)}
+                {detailView(t.id, props.directory)}
               </div>
             )}
           </For>
         </Show>
+      </Show>
+      <Show when={siblings().length > 0}>
+        <div style={meta}>
+          <span>
+            {ctx.t("panel.elsewhere")} · {siblings().length}
+          </span>
+        </div>
+        <For each={siblings()}>
+          {(s) => {
+            const tail = s.path.split(/[\\/]/).pop() ?? s.path
+            const dup =
+              s.active !== null &&
+              list().some(
+                (t) =>
+                  t.id === s.active!.activeId &&
+                  t.state === s.active!.state &&
+                  t.progress.phases_verified === s.active!.progress.phases_verified &&
+                  t.progress.tasks_done === s.active!.progress.tasks_done,
+              )
+
+            return (
+              <div style={archivedCard}>
+                <div style={titleRow}>
+                  <p style={{ ...titleText, "font-size": "12.5px", "font-weight": "550" }}>
+                    {tail}
+                  </p>
+                  <span style={{ flex: "1" }} />
+                  <span style={{ ...chip, color: dot(s.active?.state ?? "") }}>
+                    {s.branch ?? ctx.t("panel.detached")}
+                  </span>
+                </div>
+                {s.active ? (
+                  dup ? (
+                    <div style={meta}>
+                      <span>
+                        ≡ {s.active.activeId} · {ctx.t("panel.shownAbove")} ({tail})
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={meta}>
+                        <span style={chip}>{s.active.state}</span>
+                        <span>
+                          P{s.active.progress.phases_verified}/{s.active.progress.phases_total} · T
+                          {s.active.progress.tasks_done}/{s.active.progress.tasks_total}
+                        </span>
+                      </div>
+                      <div style={actions}>
+                        <button
+                          style={ghostButton}
+                          onClick={() => select(s.active!.activeId, s.path)}
+                        >
+                          {ctx.t("panel.detail")}
+                        </button>
+                      </div>
+                      {detailView(s.active.activeId, s.path)}
+                    </>
+                  )
+                ) : (
+                  <div style={meta}>
+                    <span>{ctx.t("panel.noActiveTrack")}</span>
+                  </div>
+                )}
+              </div>
+            )
+          }}
+        </For>
       </Show>
     </div>
   )

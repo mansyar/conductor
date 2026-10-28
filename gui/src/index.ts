@@ -10,7 +10,7 @@ import { ConductorRpc } from "./rpc.js"
 //
 // READ-ONLY CONTRACT (mirrors gui/README.md guardrails):
 // - node:fs reads only, never writes.
-// - git: `branch --show-current` only.
+// - git: `branch --show-current` and `worktree list --porcelain` only.
 // - gh: `pr view` only (no create/merge/edit/comment).
 // State derivation mirrors the skills: registry markers ([ ]/[~]/[x]/[-]),
 // archive-is-storage, metadata progress as written by conductor-implement.
@@ -164,6 +164,76 @@ async function getBranch(directory: string): Promise<string | null> {
   return branch
 }
 
+interface ActiveInfo {
+  initialized: boolean
+  activeId: string | null
+  state: string | null
+  progress: {
+    phases_total: number
+    phases_verified: number
+    tasks_total: number
+    tasks_done: number
+  } | null
+}
+
+// Shared by activeTrack and worktrees: branch-matched active track plus its
+// metadata state and full progress, all from local files plus one cached
+// `git branch --show-current`. Never touches the network.
+async function readActive(directory: string): Promise<ActiveInfo> {
+  const none: ActiveInfo = { initialized: false, activeId: null, state: null, progress: null }
+  let registry: string
+
+  try {
+    registry = await readFile(path.join(directory, "conductor", "tracks.md"), "utf-8")
+  } catch {
+    return none
+  }
+
+  const branch = await getBranch(directory)
+
+  if (branch === null) return { ...none, initialized: true }
+
+  const { entries } = parseRegistry(registry)
+
+  // Fast path: new-track branches are `<prefix>/<track-id>`.
+  const tail = branch.split("/").pop() ?? ""
+  let match = entries.find((candidate) => candidate.id === tail)
+  let metadata: Record<string, any> | null = null
+
+  // Fallback: match metadata branch fields (covers renamed branches).
+  if (!match) {
+    for (const candidate of entries) {
+      const meta = await readTrackMeta(directory, candidate.id)
+
+      if (meta?.branch === branch) {
+        match = candidate
+        metadata = meta
+        break
+      }
+    }
+  }
+
+  if (!match) return { ...none, initialized: true }
+
+  metadata ??= await readTrackMeta(directory, match.id)
+
+  if (!metadata) return { ...none, initialized: true }
+
+  const progress = metadata.progress ?? {}
+
+  return {
+    initialized: true,
+    activeId: match.id,
+    state: typeof metadata.status === "string" ? metadata.status : "unknown",
+    progress: {
+      phases_total: progress.phases_total ?? 0,
+      phases_verified: progress.phases_verified ?? 0,
+      tasks_total: progress.tasks_total ?? 0,
+      tasks_done: progress.tasks_done ?? 0,
+    },
+  }
+}
+
 export default Plugin.define({
   id: "conductor",
   async setup(ctx) {
@@ -235,52 +305,56 @@ export default Plugin.define({
 
       activeTrack: async (input: unknown) => {
         const { directory } = input as { directory: string }
-        let registry: string
-
-        try {
-          registry = await readFile(path.join(directory, "conductor", "tracks.md"), "utf-8")
-        } catch {
-          return { initialized: false, activeId: null, progress: null }
-        }
-
-        const branch = await getBranch(directory)
-
-        if (branch === null) return { initialized: true, activeId: null, progress: null }
-
-        const { entries } = parseRegistry(registry)
-
-        // Fast path: new-track branches are `<prefix>/<track-id>`.
-        const tail = branch.split("/").pop() ?? ""
-        let match = entries.find((candidate) => candidate.id === tail)
-        let metadata: Record<string, any> | null = null
-
-        // Fallback: match metadata branch fields (covers renamed branches).
-        if (!match) {
-          for (const candidate of entries) {
-            const meta = await readTrackMeta(directory, candidate.id)
-
-            if (meta?.branch === branch) {
-              match = candidate
-              metadata = meta
-              break
-            }
-          }
-        }
-
-        if (!match) return { initialized: true, activeId: null, progress: null }
-
-        metadata ??= await readTrackMeta(directory, match.id)
-        const progress = metadata?.progress
+        const active = await readActive(directory)
 
         return {
-          initialized: true,
-          activeId: match.id,
-          progress:
-            typeof progress?.phases_total === "number" &&
-            typeof progress?.phases_verified === "number"
-              ? { phases_total: progress.phases_total, phases_verified: progress.phases_verified }
-              : null,
+          initialized: active.initialized,
+          activeId: active.activeId,
+          progress: active.progress
+            ? {
+                phases_total: active.progress.phases_total,
+                phases_verified: active.progress.phases_verified,
+              }
+            : null,
         }
+      },
+
+      worktrees: async (input: unknown) => {
+        const { directory } = input as { directory: string }
+        let out: string
+
+        try {
+          out = await run("git", ["worktree", "list", "--porcelain"], directory, 10_000)
+        } catch {
+          return { worktrees: [] }
+        }
+
+        const here = path.resolve(directory).toLowerCase()
+        const siblings = []
+
+        for (const block of out.split(/\r?\n\r?\n/)) {
+          const wt = /^worktree (.+)$/m.exec(block)?.[1]?.trim()
+
+          if (!wt || path.resolve(wt).toLowerCase() === here) continue
+          if (/^bare$/m.test(block)) continue
+
+          const ref = /^branch (.+)$/m.exec(block)?.[1]?.trim() ?? null
+          const active = await readActive(wt)
+
+          // Worktrees without conductor state are not our business.
+          if (!active.initialized) continue
+
+          siblings.push({
+            path: wt,
+            branch: ref?.replace(/^refs\/heads\//, "") ?? null,
+            detached: /^detached$/m.test(block),
+            active: active.activeId
+              ? { activeId: active.activeId, state: active.state, progress: active.progress }
+              : null,
+          })
+        }
+
+        return { worktrees: siblings }
       },
 
       trackDetail: async (input: unknown) => {
