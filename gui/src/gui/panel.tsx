@@ -355,6 +355,9 @@ export function TracksView(props: { directory: string; server: string }) {
         <button style={ghostButton} onClick={() => ctx.system.openExternal(t.pr_url!)}>
           {ctx.t("panel.openPR")}
         </button>
+        <button style={ghostButton} onClick={() => trigger(`conductor implement watch ${t.id}`)}>
+          {ctx.t("panel.watch")}
+        </button>
       </Show>
       <button
         style={ghostButton}
@@ -422,6 +425,9 @@ export function TracksView(props: { directory: string; server: string }) {
             : `${list().length} · ${allLive().length} ${ctx.t("panel.live")}`}
         </span>
         <span style={{ flex: "1" }} />
+        <button style={ghostButton} onClick={() => trigger("conductor implement cleanup")}>
+          {ctx.t("panel.cleanup")}
+        </button>
         <button
           style={{ ...iconButton, opacity: loading() ? "0.4" : "0.75" }}
           onClick={() => {

@@ -22,6 +22,8 @@ export const en = {
   "panel.detailLoading": "Loading detail…",
   "panel.checks": "checks",
   "panel.implement": "Implement",
+  "panel.watch": "Watch",
+  "panel.cleanup": "Cleanup",
   "panel.status": "Status",
   "panel.openPR": "Open PR",
 }
