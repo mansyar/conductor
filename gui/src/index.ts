@@ -80,7 +80,10 @@ async function readJson(file: string): Promise<Record<string, any> | null> {
 }
 
 async function run(cmd: string, args: string[], cwd: string, timeout: number): Promise<string> {
-  const { stdout } = await execFileAsync(cmd, args, { cwd, timeout })
+  // windowsHide: without it every spawn flashes a console window on Windows
+  // (one flash per git/gh call: tab open fires listTracks twice, session
+  // switches re-fire it via the composer pill).
+  const { stdout } = await execFileAsync(cmd, args, { cwd, timeout, windowsHide: true })
 
   return stdout.trim()
 }
