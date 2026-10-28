@@ -23,6 +23,9 @@ counts. `src/stub.ts` is deleted.
 - The `Conductor: Show tracks` command toggles the tab.
 - The composer pill shows the active track (`<id> · P<verified>/<total>`)
   and opens the tab on click.
+- Keybind: the plugin exposes no fixed shortcut (the GUI SDK has no
+  plugin-declared keybind API). Bind your own in Desktop Settings >
+  Keybinds to the `Conductor: Show tracks` command.
 
 ## Guardrails (non-negotiable)
 
@@ -56,5 +59,5 @@ GUI in every window on each rebuild.
 
 - Phase 2: replace `stub.ts` with RPC reads of `conductor/tracks.md`,
   `conductor/tracks|archive/*/metadata.json`, and on-demand `gh pr view`.
-- Later: commands with keybinds, Workflow Config settings page.
+- Later: Workflow Config settings page (read-only first).
 - Much later, if ever: merge-approval dialog (skill stays the gate).
