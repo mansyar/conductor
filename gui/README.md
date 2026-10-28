@@ -30,7 +30,7 @@ npm run build   # emits dist/gui-experimental.cjs (gitignored)
 
 ```jsonc title="opencode.jsonc"
 {
-  "plugins": ["D:/Projects/conductor/gui"],
+  "plugin": ["D:/Projects/conductor/gui"],
 }
 ```
 
