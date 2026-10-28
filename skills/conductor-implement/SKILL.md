@@ -297,6 +297,12 @@ evidence paths; deviations; and notes.
   the result you expect in `blockers`, and set status "blocked". The primary
   runs it and hands the output back.
 - Prefer the native read, grep, and glob tools over shell equivalents.
+- Bound git output with flags, never pipes: `git log --oneline --max-count=20
+  <range>`, `git diff --stat`, `git show --stat <sha>`. Pipes and `&&` chains
+  are denied; do not attempt them.
+- Your shell covers git inspection, `git add`/`git commit` (never `--amend`),
+  and the Verification command above. Anything else — and anything denied —
+  goes in `blockers`, not around them.
 - Do not run git push, merge, rebase, reset, clean, switch, checkout, tag, or
   stash.
 - Commit task-level changes with conventional messages. Do not amend. Commit the
