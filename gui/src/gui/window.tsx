@@ -36,7 +36,6 @@ export const setup: Plugin.Setup<typeof definition> = (ctx) => {
       return ctx.t("panel.title")
     },
     closable: "compact",
-    fallback: true,
   }
 
   ctx.add(
