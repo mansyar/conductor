@@ -17,8 +17,7 @@ import { ConductorRpc } from "./rpc.js"
 
 const execFileAsync = promisify(execFile)
 
-const TRACK_LINE =
-  /^- \[( |~|x|-)\] \*\*Track: (.+?)\*\* — \[(.+?)\]\(\.\/(tracks|archive)\/(.+?)\/index\.md\) — (\S+) — (\S+)\s*$/
+const TRACK_LINE_NOTE = "retired: registry lines are parsed tolerantly, see parseRegistry"
 
 const ID_SAFE = /^[0-9A-Za-z][0-9A-Za-z_-]*$/
 
@@ -51,24 +50,63 @@ interface RegistryEntry {
   priority: string
 }
 
-function parseRegistry(text: string): RegistryEntry[] {
+export function parseRegistry(text: string): { entries: RegistryEntry[]; skipped: number } {
   const entries: RegistryEntry[] = []
+  let skipped = 0
 
-  for (const line of text.split(/\r?\n/)) {
-    const m = TRACK_LINE.exec(line.trim())
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim()
+    const marker = /^- \[([ ~x-])\]/.exec(line)
 
-    if (!m || !ID_SAFE.test(m[5])) continue
+    if (!marker) continue
+
+    const title = /\*\*Track:\s*(.+?)\*\*/.exec(line)?.[1]?.trim()
+
+    // v2 + transitional: [text](./tracks|archive/<id>/index.md), ./ prefix optional.
+    const link = /\]\((?:\.\/)?(?:tracks|archive)\/(.+?)\/index\.md\)/.exec(line)?.[1]
+    // v1: *(archived DATE — see conductor/archive/<id>)*, no index.md link.
+    const legacy = /conductor\/archive\/([0-9A-Za-z][0-9A-Za-z_-]*)/.exec(line)?.[1]
+    const id = link ?? legacy
+
+    if (!title || !id || !ID_SAFE.test(id)) {
+      skipped++
+      continue
+    }
+
+    // Type/priority live after the link (or after the title when link-less):
+    // strip a trailing *(archived …)* note, then take the last two segments.
+    // Both are optional; v1 lines have neither.
+    let rest = line
+    const linkMatch = /\]\((?:\.\/)?(?:tracks|archive)\/.+?\/index\.md\)/.exec(line)
+
+    if (linkMatch?.index !== undefined) {
+      rest = line.slice(linkMatch.index + linkMatch[0].length)
+    } else {
+      const titleMatch = /\*\*Track:\s*.+?\*\*/.exec(line)
+
+      if (titleMatch?.index !== undefined) {
+        rest = line.slice(titleMatch.index + titleMatch[0].length)
+      }
+    }
+
+    rest = rest.replace(/\s*\*?\(archived\s[^)]*\)\*?\s*$/i, "")
+    const tokens = rest
+      .split(/\s*[—–-]\s*/)
+      .map((token) => token.replace(/^\*+|\*+$/g, "").trim())
+      .filter((token) => token.length > 0)
+    const priority = tokens.length >= 2 ? tokens[tokens.length - 1] : ""
+    const type = tokens.length >= 2 ? tokens[tokens.length - 2] : (tokens[0] ?? "")
 
     entries.push({
-      marker: MARKER[m[1]] ?? "pending",
-      title: m[2],
-      id: m[3],
-      type: m[6],
-      priority: m[7],
+      marker: MARKER[marker[1]] ?? "pending",
+      title,
+      id,
+      type,
+      priority,
     })
   }
 
-  return entries
+  return { entries, skipped }
 }
 
 async function readJson(file: string): Promise<Record<string, any> | null> {
@@ -149,8 +187,9 @@ export default Plugin.define({
         }
 
         const tracks = []
+        const { entries, skipped } = parseRegistry(registry)
 
-        for (const entry of parseRegistry(registry)) {
+        for (const entry of entries) {
           const inTracks = path.join(directory, "conductor", "tracks", entry.id, "metadata.json")
           const inArchive = path.join(directory, "conductor", "archive", entry.id, "metadata.json")
           const archived = (await readJson(inTracks)) === null
@@ -184,7 +223,7 @@ export default Plugin.define({
             ? (tracks.find((t) => t.branch === currentBranch)?.id ?? null)
             : null
 
-        return { initialized: true, activeId, tracks }
+        return { initialized: true, activeId, tracks, skipped }
       },
 
       activeTrack: async (input: unknown) => {
@@ -201,7 +240,7 @@ export default Plugin.define({
 
         if (branch === null) return { initialized: true, activeId: null, progress: null }
 
-        const entries = parseRegistry(registry)
+        const { entries } = parseRegistry(registry)
 
         // Fast path: new-track branches are `<prefix>/<track-id>`.
         const tail = branch.split("/").pop() ?? ""

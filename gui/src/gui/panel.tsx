@@ -45,13 +45,22 @@ interface Detail {
   pr: { state: string; mergeable: string | null; checks: string; url: string } | null
 }
 
-async function fetchTracks(ctx: TrackContext, directory: string): Promise<Track[]> {
+interface TrackList {
+  initialized: boolean
+  tracks: Track[]
+  skipped: number
+}
+
+async function fetchTracks(ctx: TrackContext, directory: string): Promise<TrackList> {
   const result = (await ctx.client.rpc(ConductorRpc).listTracks({ directory })) as unknown as {
     initialized: boolean
     tracks: Track[]
+    skipped: number
   }
 
-  return result.initialized ? result.tracks : []
+  return result.initialized
+    ? { initialized: true, tracks: result.tracks, skipped: result.skipped ?? 0 }
+    : { initialized: false, tracks: [], skipped: 0 }
 }
 
 type TrackContext = ReturnType<typeof usePlugin<typeof definition>>
@@ -90,10 +99,15 @@ export function TracksView(props: { directory: string; server: string }) {
       <Show when={tracks.error}>
         <p>{ctx.t("panel.error")}</p>
       </Show>
-      <Show when={tracks() && tracks()!.length === 0}>
+      <Show when={tracks()?.tracks.length === 0}>
         <p>{ctx.t("panel.empty")}</p>
       </Show>
-      <For each={tracks() ?? []}>
+      <Show when={(tracks()?.skipped ?? 0) > 0}>
+        <p>
+          {tracks()!.skipped} {ctx.t("panel.skipped")}
+        </p>
+      </Show>
+      <For each={tracks()?.tracks ?? []}>
         {(track) => (
           <div style={row}>
             <div style={{ display: "flex", gap: "6px", "align-items": "baseline" }}>

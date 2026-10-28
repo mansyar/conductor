@@ -6,6 +6,7 @@ export const en = {
   "menu.noSessionDetail": "Open a session first, then choose Conductor tracks again.",
   "panel.title": "Conductor",
   "panel.empty": "No conductor tracks in this repository.",
+  "panel.skipped": "registry lines could not be read.",
   "panel.error": "Could not read conductor tracks.",
   "panel.archived": "archived",
   "panel.detail": "Detail",
