@@ -88,8 +88,42 @@ async function run(cmd: string, args: string[], cwd: string, timeout: number): P
   return stdout.trim()
 }
 
+async function readTrackMeta(
+  directory: string,
+  id: string,
+): Promise<Record<string, any> | null> {
+  const inTracks = path.join(directory, "conductor", "tracks", id, "metadata.json")
+  const inArchive = path.join(directory, "conductor", "archive", id, "metadata.json")
+
+  return (await readJson(inTracks)) ?? (await readJson(inArchive))
+}
+
 function zeroProgress() {
   return { phases_total: 0, phases_verified: 0, tasks_total: 0, tasks_done: 0 }
+}
+
+// Branch lookups spawn a process (~100ms on Windows). Cache them briefly per
+// directory: branch changes only on checkout, and the composer pill re-fires
+// on every session switch, so uncached this is the hot-path cost.
+const branchCache = new Map<string, { at: number; branch: string | null }>()
+const BRANCH_TTL = 10_000
+
+async function getBranch(directory: string): Promise<string | null> {
+  const cached = branchCache.get(directory)
+
+  if (cached && Date.now() - cached.at < BRANCH_TTL) return cached.branch
+
+  let branch: string | null = null
+
+  try {
+    branch = await run("git", ["branch", "--show-current"], directory, 10_000)
+  } catch {
+    branch = null
+  }
+
+  branchCache.set(directory, { at: Date.now(), branch })
+
+  return branch
 }
 
 export default Plugin.define({
@@ -109,7 +143,7 @@ export default Plugin.define({
         let currentBranch: string | null = null
 
         try {
-          currentBranch = await run("git", ["branch", "--show-current"], directory, 10_000)
+          currentBranch = await getBranch(directory)
         } catch {
           currentBranch = null
         }
@@ -151,6 +185,56 @@ export default Plugin.define({
             : null
 
         return { initialized: true, activeId, tracks }
+      },
+
+      activeTrack: async (input: unknown) => {
+        const { directory } = input as { directory: string }
+        let registry: string
+
+        try {
+          registry = await readFile(path.join(directory, "conductor", "tracks.md"), "utf-8")
+        } catch {
+          return { initialized: false, activeId: null, progress: null }
+        }
+
+        const branch = await getBranch(directory)
+
+        if (branch === null) return { initialized: true, activeId: null, progress: null }
+
+        const entries = parseRegistry(registry)
+
+        // Fast path: new-track branches are `<prefix>/<track-id>`.
+        const tail = branch.split("/").pop() ?? ""
+        let match = entries.find((candidate) => candidate.id === tail)
+        let metadata: Record<string, any> | null = null
+
+        // Fallback: match metadata branch fields (covers renamed branches).
+        if (!match) {
+          for (const candidate of entries) {
+            const meta = await readTrackMeta(directory, candidate.id)
+
+            if (meta?.branch === branch) {
+              match = candidate
+              metadata = meta
+              break
+            }
+          }
+        }
+
+        if (!match) return { initialized: true, activeId: null, progress: null }
+
+        metadata ??= await readTrackMeta(directory, match.id)
+        const progress = metadata?.progress
+
+        return {
+          initialized: true,
+          activeId: match.id,
+          progress:
+            typeof progress?.phases_total === "number" &&
+            typeof progress?.phases_verified === "number"
+              ? { phases_total: progress.phases_total, phases_verified: progress.phases_verified }
+              : null,
+        }
       },
 
       trackDetail: async (input: unknown) => {

@@ -9,13 +9,16 @@ API — expect maintenance when the SDK stabilizes.
 Live data over RPC. `listTracks` reads `conductor/tracks.md`, resolves each
 entry's `metadata.json` from `conductor/tracks/<id>/` then
 `conductor/archive/<id>/`, and matches the active track against
-`git branch --show-current`. `trackDetail` parses `plan.md` phases and runs
-`gh pr view` on demand for PR state plus check counts. `src/stub.ts` is deleted.
+`git branch --show-current`. `activeTrack` is the cheap per-session-switch
+call the composer pill uses: registry read plus the active track's metadata
+only, with the branch lookup cached 10s per directory. `trackDetail` parses
+`plan.md` phases and runs `gh pr view` on demand for PR state plus check
+counts. `src/stub.ts` is deleted.
 
 ## Access
 
-- The **Conductor** tab is pinned in the session side region: always listed,
-  never closed or dragged away.
+- The **Conductor** tab lives in the session side region (unpinned — open it
+  from the launcher, the + menu, or the command).
 - The side panel **+** menu has a "Conductor tracks" launcher.
 - The `Conductor: Show tracks` command toggles the tab.
 - The composer pill shows the active track (`<id> · P<verified>/<total>`)

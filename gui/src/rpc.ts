@@ -67,8 +67,33 @@ export const ConductorRpc = Rpc.define({
         additionalProperties: false,
       },
     },
-    trackDetail: {
+    activeTrack: {
       input: {
+        type: "object",
+        properties: { directory: { type: "string" } },
+        required: ["directory"],
+        additionalProperties: false,
+      },
+      output: {
+        type: "object",
+        properties: {
+          initialized: { type: "boolean" },
+          activeId: { type: ["string", "null"] },
+          progress: {
+            type: ["object", "null"],
+            properties: {
+              phases_total: { type: "number" },
+              phases_verified: { type: "number" },
+            },
+            required: ["phases_total", "phases_verified"],
+            additionalProperties: false,
+          },
+        },
+        required: ["initialized", "activeId", "progress"],
+        additionalProperties: false,
+      },
+    },
+    trackDetail: {      input: {
         type: "object",
         properties: {
           directory: { type: "string" },

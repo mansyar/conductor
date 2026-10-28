@@ -8,28 +8,26 @@ import { TracksView } from "./panel"
 // live composer pill. No conductor/** writes and no session driving here —
 // only layout.draft, which the user reviews and sends.
 
-interface LiveTrack {
-  id: string
+interface ActiveInfo {
+  initialized: boolean
+  activeId: string | null
   progress: {
     phases_total: number
     phases_verified: number
-  }
-}
-
-interface LiveList {
-  initialized: boolean
-  activeId: string | null
-  tracks: LiveTrack[]
+  } | null
 }
 
 export const setup: Plugin.Setup<typeof definition> = (ctx) => {
-  const tracks = createLatest(
+  // Pill data stays cheap on session switches: one registry read plus the
+  // active track's metadata, no full scan. The full list loads only when the
+  // tab itself renders.
+  const active = createLatest(
     () => ctx.sessions.current()?.directory,
     (directory, _signal) =>
       ctx.client
         .rpc(ConductorRpc)
-        .listTracks({ directory })
-        .then((result) => result as unknown as LiveList),
+        .activeTrack({ directory })
+        .then((result) => result as unknown as ActiveInfo),
   )
 
   const tracksTab: PanelTab = {
@@ -94,13 +92,16 @@ export const setup: Plugin.Setup<typeof definition> = (ctx) => {
   ctx.add(ComposerPill, {
     id: "track",
     show: (input) => {
-      const live = tracks.latest
-      const active = live?.tracks.find((track) => track.id === live.activeId)
+      const live = active.latest
 
-      if (!active) return undefined
+      if (!live?.activeId) return undefined
+
+      const progress = live.progress
 
       return {
-        label: `${active.id} · P${active.progress.phases_verified}/${active.progress.phases_total}`,
+        label: progress
+          ? `${live.activeId} · P${progress.phases_verified}/${progress.phases_total}`
+          : live.activeId,
         title: ctx.t("title"),
         run: () => ctx.layout.open(`${ctx.id}:tracks`, input.session),
       }
