@@ -339,12 +339,18 @@ export function TracksView(props: { directory: string; server: string }) {
           {list().length} · {live().length} {ctx.t("panel.live")}
         </span>
         <span style={{ flex: "1" }} />
-        <button style={iconButton} onClick={() => refetch()} title={ctx.t("panel.refresh")}>
+        <button
+          style={{ ...iconButton, opacity: tracks.loading ? "0.4" : "0.75" }}
+          onClick={() => {
+            if (!tracks.loading) refetch()
+          }}
+          title={ctx.t("panel.refresh")}
+        >
           ⟳
         </button>
       </div>
 
-      <Show when={tracks.loading}>
+      <Show when={tracks.loading && !tracks()}>
         <ui.Loader size="large" />
       </Show>
       <Show when={tracks.error}>
