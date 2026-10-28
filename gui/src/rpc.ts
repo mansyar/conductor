@@ -26,6 +26,7 @@ const trackSchema = {
     pr_url: { type: ["string", "null"] },
     pr_state: { type: ["string", "null"] },
     archived: { type: "boolean" },
+    hasMetadata: { type: "boolean" },
     nextAction: { type: "string" },
   },
   required: [
@@ -41,6 +42,7 @@ const trackSchema = {
     "pr_url",
     "pr_state",
     "archived",
+    "hasMetadata",
     "nextAction",
   ],
   additionalProperties: false,

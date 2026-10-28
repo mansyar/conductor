@@ -3,11 +3,15 @@ import { usePlugin } from "@opencode/plugin/gui"
 import { ConductorRpc } from "../rpc.js"
 import type { definition } from "./definition"
 
-const MARKER: Record<string, string> = {
-  pending: "○",
-  active: "◐",
-  complete: "●",
-  reverted: "✕",
+const ACCENT = "#7c9aff"
+const STATE_COLOR: Record<string, string> = {
+  complete: "#4ade80",
+  reverted: "#8a8f98",
+  in_progress: ACCENT,
+  fixes: "#fbbf24",
+  blocked: "#f87171",
+  in_review: "#c084fc",
+  pr_open: "#22d3ee",
 }
 
 interface Progress {
@@ -30,6 +34,7 @@ interface Track {
   pr_url: string | null
   pr_state: string | null
   archived: boolean
+  hasMetadata: boolean
   nextAction: string
 }
 
@@ -47,6 +52,7 @@ interface Detail {
 
 interface TrackList {
   initialized: boolean
+  activeId: string | null
   tracks: Track[]
   skipped: number
 }
@@ -54,22 +60,183 @@ interface TrackList {
 async function fetchTracks(ctx: TrackContext, directory: string): Promise<TrackList> {
   const result = (await ctx.client.rpc(ConductorRpc).listTracks({ directory })) as unknown as {
     initialized: boolean
+    activeId: string | null
     tracks: Track[]
     skipped: number
   }
 
   return result.initialized
-    ? { initialized: true, tracks: result.tracks, skipped: result.skipped ?? 0 }
-    : { initialized: false, tracks: [], skipped: 0 }
+    ? {
+        initialized: true,
+        activeId: result.activeId,
+        tracks: result.tracks,
+        skipped: result.skipped ?? 0,
+      }
+    : { initialized: false, activeId: null, tracks: [], skipped: 0 }
 }
 
 type TrackContext = ReturnType<typeof usePlugin<typeof definition>>
 
+const container: Record<string, string> = {
+  display: "flex",
+  "flex-direction": "column",
+  gap: "10px",
+  padding: "12px 14px 20px",
+  "font-size": "13px",
+  "line-height": "1.45",
+}
+
+const header: Record<string, string> = {
+  display: "flex",
+  "align-items": "center",
+  gap: "8px",
+}
+
+const wordmark: Record<string, string> = {
+  "font-size": "11px",
+  "font-weight": "700",
+  "letter-spacing": "0.14em",
+  opacity: "0.55",
+}
+
+const countPill: Record<string, string> = {
+  "font-size": "11px",
+  "font-weight": "600",
+  padding: "1px 8px",
+  "border-radius": "999px",
+  background: "rgba(127,127,127,0.14)",
+  opacity: "0.85",
+  "white-space": "nowrap",
+}
+
+const iconButton: Record<string, string> = {
+  background: "transparent",
+  border: "1px solid rgba(127,127,127,0.25)",
+  "border-radius": "6px",
+  color: "inherit",
+  cursor: "pointer",
+  "font-size": "12px",
+  padding: "2px 9px",
+  opacity: "0.75",
+}
+
+const ghostButton: Record<string, string> = {
+  background: "transparent",
+  border: "1px solid rgba(127,127,127,0.28)",
+  "border-radius": "6px",
+  color: "inherit",
+  cursor: "pointer",
+  "font-size": "12px",
+  padding: "3px 11px",
+  "white-space": "nowrap",
+}
+
+const primaryButton: Record<string, string> = {
+  ...ghostButton,
+  background: "rgba(124,154,255,0.16)",
+  "border-color": "rgba(124,154,255,0.55)",
+  "font-weight": "600",
+}
+
+const card: Record<string, string> = {
+  display: "flex",
+  "flex-direction": "column",
+  gap: "7px",
+  padding: "11px 13px",
+  "border-radius": "10px",
+  background: "rgba(127,127,127,0.08)",
+  border: "1px solid rgba(127,127,127,0.16)",
+}
+
+const activeCard: Record<string, string> = {
+  ...card,
+  "border-left": `3px solid ${ACCENT}`,
+}
+
+const archivedCard: Record<string, string> = {
+  ...card,
+  padding: "8px 11px",
+  gap: "5px",
+  opacity: "0.92",
+}
+
+const titleRow: Record<string, string> = {
+  display: "flex",
+  gap: "8px",
+  "align-items": "flex-start",
+}
+
+const titleText: Record<string, string> = {
+  margin: "0",
+  "font-size": "13px",
+  "font-weight": "650",
+  display: "-webkit-box",
+  "-webkit-line-clamp": "2",
+  "-webkit-box-orient": "vertical",
+  overflow: "hidden",
+}
+
+const chip: Record<string, string> = {
+  "font-size": "11px",
+  "font-weight": "600",
+  padding: "1px 8px",
+  "border-radius": "999px",
+  background: "rgba(127,127,127,0.14)",
+  "white-space": "nowrap",
+  "flex-shrink": "0",
+}
+
+const meta: Record<string, string> = {
+  "font-size": "11.5px",
+  opacity: "0.6",
+  display: "flex",
+  gap: "8px",
+  "flex-wrap": "wrap",
+}
+
+const actions: Record<string, string> = {
+  display: "flex",
+  gap: "6px",
+  "flex-wrap": "wrap",
+}
+
+const barTrack: Record<string, string> = {
+  height: "4px",
+  "border-radius": "2px",
+  background: "rgba(127,127,127,0.22)",
+  overflow: "hidden",
+}
+
+const sectionToggle: Record<string, string> = {
+  ...ghostButton,
+  display: "flex",
+  "align-items": "center",
+  gap: "6px",
+  "align-self": "flex-start",
+  "font-weight": "600",
+}
+
+const detailBox: Record<string, string> = {
+  display: "flex",
+  "flex-direction": "column",
+  gap: "3px",
+  padding: "8px 10px",
+  "border-radius": "8px",
+  background: "rgba(127,127,127,0.07)",
+  "font-size": "12px",
+}
+
+function dot(state: string): string {
+  return STATE_COLOR[state] ?? "rgba(127,127,127,0.6)"
+}
+
 export function TracksView(props: { directory: string; server: string }) {
   const ctx = usePlugin<typeof definition>()
-  const ui = ctx.ui
-  const [tracks] = createResource(() => props.directory, (dir) => fetchTracks(ctx, dir))
+  const [tracks, { refetch }] = createResource(() => props.directory, (dir) =>
+    fetchTracks(ctx, dir),
+  )
   const [selected, setSelected] = createSignal<string | null>(null)
+  const [showArchived, setShowArchived] = createSignal(false)
   const [detail] = createResource(selected, async (id) => {
     if (!id) return null
 
@@ -83,100 +250,229 @@ export function TracksView(props: { directory: string; server: string }) {
   const draft = (prompt: string) =>
     ctx.layout.draft({ server: props.server, directory: props.directory, prompt })
 
-  const row: Record<string, string> = {
-    display: "flex",
-    "flex-direction": "column",
-    gap: "2px",
-    padding: "6px 0",
-    "border-bottom": "1px solid var(--border, #333)",
-  }
+  const list = () => tracks()?.tracks ?? []
+  const live = () => list().filter((t) => !t.archived)
+  const archived = () => list().filter((t) => t.archived)
+  const active = () => list().find((t) => t.id === tracks()?.activeId) ?? live()[0]
 
+  const progressLine = (t: Track) =>
+    t.hasMetadata
+      ? `P${t.progress.phases_verified}/${t.progress.phases_total} · T${t.progress.tasks_done}/${t.progress.tasks_total}`
+      : ctx.t("panel.noMetadata")
+
+  const phasePct = (t: Track) =>
+    t.progress.phases_total > 0
+      ? Math.round((t.progress.phases_verified / t.progress.phases_total) * 100)
+      : 0
+
+  const buttons = (t: Track, primary: boolean) => (
+    <div style={actions}>
+      <button
+        style={primary ? primaryButton : ghostButton}
+        onClick={() => draft(`conductor implement ${t.id}`)}
+      >
+        {ctx.t("panel.implement")}
+      </button>
+      <button style={ghostButton} onClick={() => draft(`conductor status ${t.id}`)}>
+        {ctx.t("panel.status")}
+      </button>
+      <Show when={t.pr_url}>
+        <button style={ghostButton} onClick={() => ctx.system.openExternal(t.pr_url!)}>
+          {ctx.t("panel.openPR")}
+        </button>
+      </Show>
+      <button
+        style={ghostButton}
+        onClick={() => setSelected((id) => (id === t.id ? null : t.id))}
+      >
+        {ctx.t("panel.detail")}
+      </button>
+    </div>
+  )
+
+  const detailView = (t: Track) => (
+    <Show when={selected() === t.id}>
+      <Show when={detail.loading}>
+        <ui.Loader size="large" />
+      </Show>
+      <Show when={detail()}>
+        {(liveDetail) => (
+          <div style={detailBox}>
+            <For each={liveDetail().phases}>
+              {(phase) => (
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <span style={{ opacity: "0.55" }}>{phase.id}</span>
+                  <span style={{ flex: "1" }}>{phase.name}</span>
+                  <span style={{ color: dot(phase.status), "white-space": "nowrap" }}>
+                    {phase.status}
+                  </span>
+                </div>
+              )}
+            </For>
+            <Show when={liveDetail().pr}>
+              {(pr) => (
+                <div style={{ display: "flex", gap: "8px", "flex-wrap": "wrap" }}>
+                  <span>
+                    PR: <strong>{pr().state}</strong>
+                  </span>
+                  <Show when={pr().mergeable}>
+                    <span style={{ opacity: "0.7" }}>{pr().mergeable}</span>
+                  </Show>
+                  <span style={{ opacity: "0.7" }}>
+                    {ctx.t("panel.checks")}: {pr().checks}
+                  </span>
+                </div>
+              )}
+            </Show>
+          </div>
+        )}
+      </Show>
+    </Show>
+  )
+
+  const ui = ctx.ui
   return (
-    <div style={{ display: "flex", "flex-direction": "column", gap: "4px", padding: "4px 8px" }}>
+    <div style={container}>
+      <div style={header}>
+        <span style={wordmark}>{ctx.t("panel.title").toUpperCase()}</span>
+        <span style={countPill}>
+          {list().length} · {live().length} {ctx.t("panel.live")}
+        </span>
+        <span style={{ flex: "1" }} />
+        <button style={iconButton} onClick={() => refetch()} title={ctx.t("panel.refresh")}>
+          ⟳
+        </button>
+      </div>
+
       <Show when={tracks.loading}>
         <ui.Loader size="large" />
       </Show>
       <Show when={tracks.error}>
-        <p>{ctx.t("panel.error")}</p>
+        <p style={meta}>{ctx.t("panel.error")}</p>
       </Show>
-      <Show when={tracks()?.tracks.length === 0}>
-        <p>{ctx.t("panel.empty")}</p>
+      <Show when={!tracks.loading && list().length === 0}>
+        <p style={meta}>{ctx.t("panel.empty")}</p>
       </Show>
       <Show when={(tracks()?.skipped ?? 0) > 0}>
-        <p>
+        <p style={meta}>
           {tracks()!.skipped} {ctx.t("panel.skipped")}
         </p>
       </Show>
-      <For each={tracks()?.tracks ?? []}>
-        {(track) => (
-          <div style={row}>
-            <div style={{ display: "flex", gap: "6px", "align-items": "baseline" }}>
-              <span>{MARKER[track.marker] ?? "?"}</span>
-              <strong>{track.title}</strong>
-              <span>
-                {track.state}
-                {track.archived ? ` · ${ctx.t("panel.archived")}` : ""}
+
+      <Show when={active()}>
+        {(t) => (
+          <div style={activeCard}>
+            <div style={titleRow}>
+              <span style={{ color: dot(t().state), "font-size": "12px", "margin-top": "2px" }}>
+                ●
               </span>
+              <p style={{ ...titleText, "font-size": "13.5px" }}>{t().title}</p>
             </div>
-            <div style={{ display: "flex", gap: "6px" }}>
-              <span>
-                P{track.progress.phases_verified}/{track.progress.phases_total}
-              </span>
-              <span>
-                T{track.progress.tasks_done}/{track.progress.tasks_total}
-              </span>
-              <span>{track.nextAction}</span>
+            <div style={meta}>
+              <span style={chip}>{t().state}</span>
+              <Show when={t().type}>
+                <span>{t().type}</span>
+              </Show>
+              <Show when={t().priority}>
+                <span>{t().priority}</span>
+              </Show>
+              <span>{progressLine(t())}</span>
             </div>
-            <div style={{ display: "flex", gap: "6px", "flex-wrap": "wrap" }}>
-              <button onClick={() => setSelected((id) => (id === track.id ? null : track.id))}>
-                {ctx.t("panel.detail")}
-              </button>
-              <Show when={track.pr_url}>
-                <button onClick={() => ctx.system.openExternal(track.pr_url!)}>
-                  {ctx.t("panel.openPR")}
-                </button>
-              </Show>
-              <button onClick={() => draft(`conductor implement ${track.id}`)}>
-                {ctx.t("panel.implement")}
-              </button>
-              <button onClick={() => draft(`conductor status ${track.id}`)}>
-                {ctx.t("panel.status")}
-              </button>
-            </div>
-            <Show when={selected() === track.id}>
-              <Show when={detail.loading}>
-                <ui.Loader size="large" />
-              </Show>
-              <Show when={detail()}>
-                {(live) => (
-                  <div style={{ display: "flex", "flex-direction": "column", gap: "2px" }}>
-                    <For each={live().phases}>
-                      {(phase) => (
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          <span>{phase.id}</span>
-                          <span>{phase.name}</span>
-                          <span>{phase.status}</span>
-                        </div>
-                      )}
-                    </For>
-                    <Show when={live().pr}>
-                      {(pr) => (
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          <span>PR: {pr().state}</span>
-                          <Show when={pr().mergeable}>
-                            <span>{pr().mergeable}</span>
-                          </Show>
-                          <span>{ctx.t("panel.checks")}: {pr().checks}</span>
-                        </div>
-                      )}
-                    </Show>
-                  </div>
-                )}
-              </Show>
+            <Show when={t().hasMetadata && t().progress.phases_total > 0}>
+              <div style={barTrack}>
+                <div
+                  style={{
+                    height: "100%",
+                    width: `${phasePct(t())}%`,
+                    background: dot(t().state),
+                    "border-radius": "2px",
+                  }}
+                />
+              </div>
             </Show>
+            <div style={{ ...meta, opacity: "0.85" }}>{t().nextAction}</div>
+            {buttons(t(), true)}
+            {detailView(t())}
           </div>
         )}
-      </For>
+      </Show>
+
+      <Show when={live().filter((t) => t.id !== active()?.id).length > 0}>
+        <For each={live().filter((t) => t.id !== active()?.id)}>
+          {(t) => (
+            <div style={card}>
+              <div style={titleRow}>
+                <span style={{ color: dot(t.state), "font-size": "11px", "margin-top": "3px" }}>
+                  ●
+                </span>
+                <p style={titleText}>{t.title}</p>
+                <span style={{ flex: "1" }} />
+                <span style={{ ...chip, color: dot(t.state) }}>{t.state}</span>
+              </div>
+              <div style={meta}>
+                <Show when={t.type}>
+                  <span>{t.type}</span>
+                </Show>
+                <Show when={t.priority}>
+                  <span>{t.priority}</span>
+                </Show>
+                <span>{progressLine(t)}</span>
+                <span>{t.nextAction}</span>
+              </div>
+              {buttons(t, false)}
+              {detailView(t)}
+            </div>
+          )}
+        </For>
+      </Show>
+
+      <Show when={archived().length > 0}>
+        <button style={sectionToggle} onClick={() => setShowArchived((v) => !v)}>
+          <span>{showArchived() ? "▾" : "▸"}</span>
+          <span>
+            {ctx.t("panel.archived")} · {archived().length}
+          </span>
+        </button>
+        <Show when={showArchived()}>
+          <For each={archived()}>
+            {(t) => (
+              <div style={archivedCard}>
+                <div style={titleRow}>
+                  <span style={{ color: dot(t.state), "font-size": "10px", "margin-top": "4px" }}>
+                    ●
+                  </span>
+                  <p style={{ ...titleText, "font-size": "12.5px", "font-weight": "550" }}>
+                    {t.title}
+                  </p>
+                </div>
+                <div style={meta}>
+                  <Show when={t.type}>
+                    <span>{t.type}</span>
+                  </Show>
+                  <Show when={t.priority}>
+                    <span>{t.priority}</span>
+                  </Show>
+                  <span>{progressLine(t)}</span>
+                </div>
+                <div style={actions}>
+                  <button
+                    style={ghostButton}
+                    onClick={() => setSelected((id) => (id === t.id ? null : t.id))}
+                  >
+                    {ctx.t("panel.detail")}
+                  </button>
+                  <Show when={t.pr_url}>
+                    <button style={ghostButton} onClick={() => ctx.system.openExternal(t.pr_url!)}>
+                      {ctx.t("panel.openPR")}
+                    </button>
+                  </Show>
+                </div>
+                {detailView(t)}
+              </div>
+            )}
+          </For>
+        </Show>
+      </Show>
     </div>
   )
 }

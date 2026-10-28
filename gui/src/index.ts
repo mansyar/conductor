@@ -196,13 +196,19 @@ export default Plugin.define({
           const metadata = archived ? await readJson(inArchive) : await readJson(inTracks)
           const progress = metadata?.progress ?? zeroProgress()
 
+          const status = metadata?.status
+          const effective = archived
+            ? status === "reverted"
+              ? "reverted"
+              : "complete"
+            : (status ?? "unknown")
           tracks.push({
             id: entry.id,
             title: metadata?.title ?? entry.title,
             type: metadata?.type ?? entry.type,
             priority: metadata?.priority ?? entry.priority,
             marker: entry.marker,
-            state: metadata?.status ?? "unknown",
+            state: effective,
             progress: {
               phases_total: progress.phases_total ?? 0,
               phases_verified: progress.phases_verified ?? 0,
@@ -214,7 +220,8 @@ export default Plugin.define({
             pr_url: metadata?.pr_url ?? null,
             pr_state: metadata?.pr_state ?? null,
             archived,
-            nextAction: NEXT_ACTION[metadata?.status] ?? "",
+            hasMetadata: metadata !== null,
+            nextAction: NEXT_ACTION[effective] ?? "",
           })
         }
 
