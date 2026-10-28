@@ -270,8 +270,21 @@ export function TracksView(props: { directory: string; server: string }) {
     return result.found ? result : null
   })
 
-  const draft = (prompt: string) =>
-    ctx.layout.draft({ server: props.server, directory: props.directory, prompt })
+  const trigger = (prompt: string) => {
+    // Prefer the mounted session's composer: the prompt lands as editable
+    // text, nothing is sent. Without a mounted session, fall back to a
+    // review-and-send draft.
+    const screen = ctx.screen.current()
+
+    if (screen) {
+      const prior = screen.composer.text()
+      const sep = prior !== "" && !prior.endsWith("\n") ? "\n" : ""
+      screen.composer.insert(`${sep}${prompt}`)
+      screen.composer.focus()
+    } else {
+      ctx.layout.draft({ server: props.server, directory: props.directory, prompt })
+    }
+  }
 
   const list = () => tracks()?.tracks ?? []
   const q = () => query().trim().toLowerCase()
@@ -307,11 +320,11 @@ export function TracksView(props: { directory: string; server: string }) {
     <div style={actions}>
       <button
         style={primary ? primaryButton : ghostButton}
-        onClick={() => draft(`conductor implement ${t.id}`)}
+        onClick={() => trigger(`conductor implement ${t.id}`)}
       >
         {ctx.t("panel.implement")}
       </button>
-      <button style={ghostButton} onClick={() => draft(`conductor status ${t.id}`)}>
+      <button style={ghostButton} onClick={() => trigger(`conductor status ${t.id}`)}>
         {ctx.t("panel.status")}
       </button>
       <Show when={t.pr_url}>

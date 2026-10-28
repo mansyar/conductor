@@ -6,7 +6,8 @@ import { TracksView } from "./panel"
 
 // Window setup: live track data over RPC, pinned side tab, + menu shortcut,
 // live composer pill. No conductor/** writes and no session driving here —
-// only layout.draft, which the user reviews and sends.
+// panel buttons insert text into the mounted session's composer (the user
+// reviews and sends), with layout.draft as the fallback.
 
 interface ActiveInfo {
   initialized: boolean
