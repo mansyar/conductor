@@ -19,6 +19,7 @@ export const en = {
   "panel.filterLive": "Live",
   "panel.filterArchived": "Archived",
   "panel.detail": "Detail",
+  "panel.detailLoading": "Loading detail…",
   "panel.checks": "checks",
   "panel.implement": "Implement",
   "panel.status": "Status",

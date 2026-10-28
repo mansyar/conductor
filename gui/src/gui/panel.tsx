@@ -1,4 +1,4 @@
-import { For, Show, createEffect, createResource, createSignal } from "solid-js"
+import { For, Show, createEffect, createSignal } from "solid-js"
 import { usePlugin } from "@opencode/plugin/gui"
 import { ConductorRpc } from "../rpc.js"
 import type { definition } from "./definition"
@@ -254,20 +254,44 @@ export function TracksView(props: { directory: string; server: string }) {
 
   createEffect(() => {
     setTracks(null)
+    setSelected(null)
+    setDetailCache({})
+    setDetailPending(null)
     load(props.directory)
   })
   const [selected, setSelected] = createSignal<string | null>(null)
   const [showArchived, setShowArchived] = createSignal(false)
   const [query, setQuery] = createSignal("")
   const [mode, setMode] = createSignal<"all" | "live" | "archived">("all")
-  const [detail] = createResource(selected, async (id) => {
-    if (!id) return null
+  // Detail results are cached per track id with stable references: every
+  // expansion otherwise swaps a large loader for fresh objects (a `gh`
+  // network call can take seconds) and flashes the window.
+  const [detailCache, setDetailCache] = createSignal<Record<string, Detail>>({})
+  const [detailPending, setDetailPending] = createSignal<string | null>(null)
 
-    const result = (await ctx.client
+  createEffect(() => {
+    const dir = props.directory
+    const id = selected()
+
+    if (!id || detailCache()[id] || detailPending() === id) return
+    setDetailPending(id)
+    ctx.client
       .rpc(ConductorRpc)
-      .trackDetail({ directory: props.directory, id })) as unknown as Detail
+      .trackDetail({ directory: dir, id })
+      .then((result) => {
+        const d = result as unknown as Detail
 
-    return result.found ? result : null
+        if (d && d.found) {
+          setDetailCache((prev) => {
+            const next = { ...prev, [id]: d }
+            return JSON.stringify(prev[id]) === JSON.stringify(d) ? prev : next
+          })
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        setDetailPending((cur) => (cur === id ? null : cur))
+      })
   })
 
   const trigger = (prompt: string) => {
@@ -343,10 +367,16 @@ export function TracksView(props: { directory: string; server: string }) {
 
   const detailView = (t: Track) => (
     <Show when={selected() === t.id}>
-      <Show when={detail.loading}>
-        <ui.Loader size="large" />
-      </Show>
-      <Show when={detail()}>
+      <Show
+        when={detailCache()[t.id]}
+        fallback={
+          <Show when={detailPending() === t.id}>
+            <div style={detailBox}>
+              <span style={meta}>{ctx.t("panel.detailLoading")}</span>
+            </div>
+          </Show>
+        }
+      >
         {(liveDetail) => (
           <div style={detailBox}>
             <For each={liveDetail().phases}>
