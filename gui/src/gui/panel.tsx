@@ -258,6 +258,8 @@ export function TracksView(props: { directory: string; server: string }) {
   })
   const [selected, setSelected] = createSignal<string | null>(null)
   const [showArchived, setShowArchived] = createSignal(false)
+  const [query, setQuery] = createSignal("")
+  const [mode, setMode] = createSignal<"all" | "live" | "archived">("all")
   const [detail] = createResource(selected, async (id) => {
     if (!id) return null
 
@@ -272,9 +274,24 @@ export function TracksView(props: { directory: string; server: string }) {
     ctx.layout.draft({ server: props.server, directory: props.directory, prompt })
 
   const list = () => tracks()?.tracks ?? []
-  const live = () => list().filter((t) => !t.archived)
-  const archived = () => list().filter((t) => t.archived)
-  const active = () => list().find((t) => t.id === tracks()?.activeId) ?? live()[0]
+  const q = () => query().trim().toLowerCase()
+  const matches = (t: Track) =>
+    (mode() === "all" ||
+      (mode() === "live" ? !t.archived : t.archived)) &&
+    (q() === "" ||
+      t.title.toLowerCase().includes(q()) ||
+      t.id.toLowerCase().includes(q()))
+  const allLive = () => list().filter((t) => !t.archived)
+  const allArchived = () => list().filter((t) => t.archived)
+  const live = () => allLive().filter(matches)
+  const archived = () => allArchived().filter(matches)
+  const filtering = () => q() !== "" || mode() !== "all"
+  const visibleCount = () => live().length + archived().length
+  const archOpen = () => showArchived() || q() !== ""
+  const active = () => {
+    const t = list().find((x) => x.id === tracks()?.activeId) ?? allLive()[0]
+    return t && matches(t) ? t : undefined
+  }
 
   const progressLine = (t: Track) =>
     t.hasMetadata
@@ -357,7 +374,9 @@ export function TracksView(props: { directory: string; server: string }) {
       <div style={header}>
         <span style={wordmark}>{ctx.t("panel.title").toUpperCase()}</span>
         <span style={countPill}>
-          {list().length} · {live().length} {ctx.t("panel.live")}
+          {filtering()
+            ? `${visibleCount()} ${ctx.t("panel.matches")}`
+            : `${list().length} · ${allLive().length} ${ctx.t("panel.live")}`}
         </span>
         <span style={{ flex: "1" }} />
         <button
@@ -371,6 +390,49 @@ export function TracksView(props: { directory: string; server: string }) {
         </button>
       </div>
 
+      <div style={{ display: "flex", "flex-direction": "column", gap: "6px" }}>
+        <input
+          type="text"
+          value={query()}
+          onInput={(e) => setQuery(e.currentTarget.value)}
+          placeholder={ctx.t("panel.search")}
+          style={{
+            width: "100%",
+            "box-sizing": "border-box",
+            background: "rgba(127,127,127,0.1)",
+            border: "1px solid rgba(127,127,127,0.25)",
+            "border-radius": "8px",
+            color: "inherit",
+            "font-size": "12.5px",
+            padding: "6px 10px",
+            outline: "none",
+          }}
+        />
+        <div style={{ display: "flex", gap: "6px" }}>
+          {(["all", "live", "archived"] as const).map((m) => (
+            <button
+              style={
+                mode() === m
+                  ? {
+                      ...ghostButton,
+                      "border-color": "rgba(124,154,255,0.55)",
+                      background: "rgba(124,154,255,0.16)",
+                      "font-weight": "600",
+                    }
+                  : ghostButton
+              }
+              onClick={() => setMode(m)}
+            >
+              {m === "all"
+                ? ctx.t("panel.filterAll")
+                : m === "live"
+                  ? ctx.t("panel.filterLive")
+                  : ctx.t("panel.filterArchived")}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <Show when={loading() && !tracks()}>
         <ui.Loader size="large" />
       </Show>
@@ -379,6 +441,9 @@ export function TracksView(props: { directory: string; server: string }) {
       </Show>
       <Show when={!loading() && list().length === 0}>
         <p style={meta}>{ctx.t("panel.empty")}</p>
+      </Show>
+      <Show when={!loading() && list().length > 0 && visibleCount() === 0}>
+        <p style={meta}>{ctx.t("panel.noMatches")}</p>
       </Show>
       <Show when={(tracks()?.skipped ?? 0) > 0}>
         <p style={meta}>
@@ -460,7 +525,7 @@ export function TracksView(props: { directory: string; server: string }) {
             {ctx.t("panel.archived")} · {archived().length}
           </span>
         </button>
-        <Show when={showArchived()}>
+        <Show when={archOpen()}>
           <For each={archived()}>
             {(t) => (
               <div style={archivedCard}>
