@@ -37,7 +37,6 @@ export const setup: Plugin.Setup<typeof definition> = (ctx) => {
     get title() {
       return ctx.t("panel.title")
     },
-    pinned: true,
     closable: "compact",
     fallback: true,
   }
@@ -50,7 +49,11 @@ export const setup: Plugin.Setup<typeof definition> = (ctx) => {
       run: () => {
         const session = ctx.sessions.current()
 
-        if (session) ctx.layout.toggle(`${ctx.id}:tracks`, session)
+        if (!session) {
+          ctx.toast.show({ title: ctx.t("menu.noSession"), description: ctx.t("menu.noSessionDetail") })
+          return
+        }
+        ctx.layout.toggle(`${ctx.id}:tracks`, session)
       },
     }),
   )
@@ -63,7 +66,11 @@ export const setup: Plugin.Setup<typeof definition> = (ctx) => {
     run: () => {
       const session = ctx.sessions.current()
 
-      if (session) ctx.layout.open(`${ctx.id}:tracks`, session)
+      if (!session) {
+        ctx.toast.show({ title: ctx.t("menu.noSession"), description: ctx.t("menu.noSessionDetail") })
+        return
+      }
+      ctx.layout.open(`${ctx.id}:tracks`, session)
     },
   }))
 

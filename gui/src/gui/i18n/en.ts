@@ -2,6 +2,8 @@ export const en = {
   title: "Conductor",
   "command.tracks": "Conductor: Show tracks",
   "menu.tracks": "Conductor tracks",
+  "menu.noSession": "No active session",
+  "menu.noSessionDetail": "Open a session first, then choose Conductor tracks again.",
   "panel.title": "Conductor",
   "panel.empty": "No conductor tracks in this repository.",
   "panel.error": "Could not read conductor tracks.",
