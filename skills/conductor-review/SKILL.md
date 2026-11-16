@@ -258,6 +258,12 @@ For a normal track review, update `metadata.json`:
 Commit only the review artifact, the metadata, and any plan state:
 `conductor(review): Record review for track '<track-id>'`.
 
+Emit a transcript-visible proof line after the commit:
+
+```text
+CONDUCTOR_PROGRESS gate=review verdict=BLOCK|PASS WITH FINDINGS|PASS round=<n> evidence=conductor/tracks/<track-id>/review.md
+```
+
 For a `revert/<track-id>` review, do **not** overwrite the original track's
 `review_verdict` or `review_rounds`. Record the verdict in `revert-review.md`
 only and commit:
@@ -317,6 +323,11 @@ For a normal track review, if there are fixable findings:
     a diff blindly or make opportunistic changes.
 5.  Re-run the configured checks. Write
     `verification/phase-R<n>.md`.
+6.  Emit a transcript-visible proof line:
+
+    ```text
+    CONDUCTOR_PROGRESS gate=review-fix round=<n> status=verified evidence=conductor/tracks/<track-id>/verification/phase-R<n>.md
+    ```
 
 ### 7.3 Re-Review
 
@@ -325,7 +336,10 @@ For a normal track review, if there are fixable findings:
     to an issue.
 3.  Maximum **2** review-fix rounds.
 4.  If still blocked after round 2, stop. Do not mark the track complete, push,
-    or open a PR. Present the remaining findings and ask the user to decide.
+    or open a PR. Emit `CONDUCTOR_STOP reason=review-block` with the remaining
+    finding IDs, present them, and ask the user to decide.
+5.  On any user decision in this loop, emit
+    `CONDUCTOR_STOP reason=user-question` and act only on the answer.
 
 ### 7.4 No Opportunistic Work
 

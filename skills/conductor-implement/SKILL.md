@@ -22,6 +22,38 @@ move the track through review to a pull request.
 -   **State Ownership:** Only you write `plan.md`, `tracks.md`, `metadata.json`, `conductor/index.md`, `review.md`, and `pr.md`. Phase subagents write code, tests, and their own evidence file.
 -   **Execution Posture (CRITICAL):** Execute the flow autonomously from the selected track to the pull request. Phase boundaries, review invocation, fix rounds, and PR creation are agent actions, not handoffs: never end a turn to ask "shall I continue?", "ready for review?", or "shall I open the PR?". Announce progress as text statements in the same turn the work continues ("Phase 2 verified, proceeding to Phase 3"). Stop for the user ONLY where the skill explicitly names the question tool; any step without that marking is executed without asking. Stop and report without a question on defined failures: a BLOCK verdict with unresolved blockers after the allowed rounds, unresolvable conflicts, missing authentication, or a closed-and-unmerged PR.
 
+## Goal Mode
+
+When the user starts this flow with an OpenCode `/goal` objective (OpenCode
+2.2.1+), the native judge is an **outer continuation engine only**. It decides
+whether the session takes another turn; Conductor files and the Skills decide
+whether the track is complete. Never treat a judge verdict as proof.
+
+Emit one transcript-visible proof line at each gate, in the same turn the work
+happens:
+
+```text
+CONDUCTOR_PROGRESS gate=phase-<n> status=verified evidence=<path> checkpoint=<sha> next=<phase|integrated-verification>
+CONDUCTOR_PROGRESS gate=integrated-verification status=pass evidence=conductor/tracks/<id>/verification/integrated.md
+CONDUCTOR_PROGRESS gate=doc-sync status=updated|none evidence=review.md
+CONDUCTOR_PROGRESS gate=completion status=archived registry=[x] metadata=conductor/archive/<id>/metadata.json pr_url=<url>
+CONDUCTOR_PROGRESS gate=pr-open url=<url> pr_state=open|unavailable
+```
+
+Emit a stop line at every defined boundary:
+
+```text
+CONDUCTOR_STOP reason=awaiting-merge pr=<url> archived=conductor/archive/<id>
+CONDUCTOR_STOP reason=<failed|blocked|dirty-tree|closed-pr|review-block|user-question>
+```
+
+The merge boundary is absolute: after the PR is open and the completion commit
+is pushed, ask the merge question with the question tool, emit
+`CONDUCTOR_STOP reason=awaiting-merge`, and stop. A goal never answers for the
+user, merges a PR, deletes branches on its own, force-pushes, resets, or writes
+outside conductor state. If a stop line is emitted, do not start another phase
+or re-open the flow unless the user explicitly resumes.
+
 ---
 
 ## 1. Handshake & Context Initialization
@@ -424,6 +456,8 @@ If any check fails, go to Section 4.9.
 7.  **Close the run:** update `.conductor/runs/<track-id>.json` with
     `status: "complete"`, the checkpoint, and `updated_at`.
 8.  **Announce:** Phase, checkpoint, evidence path, and any accepted deviation.
+9.  **Goal proof:** emit a transcript-visible line:
+    `CONDUCTOR_PROGRESS gate=phase-<n> status=verified evidence=conductor/tracks/<track-id>/verification/phase-<n>.md checkpoint=<sha> next=<phase|integrated-verification>`.
 
 ### 4.9 Rework, Failure, and Blocking
 
@@ -452,8 +486,10 @@ After every phase is `verified`:
     the integrated check, not a repeat of one phase.
 2.  Write `conductor/tracks/<track-id>/verification/integrated.md` with the
     commands, exit codes, and a summary.
-3.  If it fails, treat it as a blocking defect. Either fix it through a new
-    phase or rework the responsible phase. Do not proceed to review.
+3.  Emit `CONDUCTOR_PROGRESS gate=integrated-verification status=pass evidence=conductor/tracks/<track-id>/verification/integrated.md`.
+4.  If it fails, emit `CONDUCTOR_STOP reason=integrated-verification-failed`
+    and treat it as a blocking defect. Either fix it through a new phase or
+    rework the responsible phase. Do not proceed to review.
 
 ---
 
@@ -466,6 +502,7 @@ After every phase is `verified`:
 4.  Product and product-guideline changes require explicit user approval.
     Tech-stack changes are recorded with a dated note.
 5.  Commit: `docs(conductor): Synchronize docs for track '<track-id>'`.
+6.  Emit `CONDUCTOR_PROGRESS gate=doc-sync status=<updated|none> evidence=review.md`.
 
 ---
 
@@ -500,6 +537,8 @@ PR without it.
         changes, update `verification/integrated.md` and commit it:
         `test(conductor): Update integrated verification for track
         '<track-id>'`.
+    -   Emit a transcript-visible line:
+        `CONDUCTOR_PROGRESS gate=post-review-sync status=<updated|none> evidence=review.md`.
 
 ---
 
@@ -615,6 +654,8 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
     -   GitLab: the equivalent merge-request URL for the repository.
 8.  Do not poll for merge here. Section 8.5 watches only when `pr.watch_ci` is
     true. Never merge the PR without an explicit confirmation asked via the question tool.
+9.  Emit a transcript-visible line:
+    `CONDUCTOR_PROGRESS gate=pr-open url=<pr_url|null> pr_state=<open|merged|unavailable|null>`.
 
 ### 8.4 Complete and Archive
 
@@ -641,7 +682,9 @@ made after it, before or after the merge.
     `chore(conductor): Complete and archive track '<track-id>'`.
 5.  Push when a remote exists. This commit must touch only `conductor/**`;
     cleanup relies on that when it compares the branch tip with the PR head.
-6.  Do not poll for merge. Section 8.5 watches only when `pr.watch_ci` is true.
+6.  Emit a transcript-visible line:
+    `CONDUCTOR_PROGRESS gate=completion status=archived registry=[x] metadata=conductor/archive/<track-id>/metadata.json`.
+7.  Do not poll for merge. Section 8.5 watches only when `pr.watch_ci` is true.
     Never merge the PR without an explicit confirmation asked via the question tool.
 
 ### 8.5 Watch CI and Offer a Merge
@@ -681,6 +724,7 @@ checks.
     sequence is explicit: the track is already archived in the completion
     commit and pushed; merging the PR is the second and final step, after
     which the branch is deleted locally and on the remote.
+    After asking, emit `CONDUCTOR_STOP reason=awaiting-merge pr=<url> archived=conductor/archive/<track-id>` and do not continue the goal until the user answers.
 8.  On **Merge now**, merge with the configured method and without deleting
     branches:
     ```bash

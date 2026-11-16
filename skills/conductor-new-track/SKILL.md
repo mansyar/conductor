@@ -314,11 +314,36 @@ nothing behind.
 9.  **Completion & Next Steps:**
     -   Inform the user that the track is created on `<branch>`, based on
       `<base_branch>`, and that the registry is updated.
-    -   Ask the user via the question tool if they would like to start implementation right now using
-      a **Yes/No question**.
-    -   **Internal Handoff:** If the user agrees, use the `conductor-implement`
-      skill to begin work. Present the transition as a natural progression
-      without mentioning the skill name.
+    -   Present the goal prompt from the template below in a fenced code block,
+        substituting the real track id. State that `/goal` requires OpenCode
+        2.2.1+; on older hosts or other harnesses, paste the prompt without
+        `/goal` for the normal flow.
+    -   Ask the user via the question tool with **single-choice** options:
+        **Use the goal prompt (Recommended)**, **Start now without a goal**,
+        **Not now**.
+    -   On **Start now without a goal**, use the `conductor-implement` skill to
+        begin work directly. Present the transition as a natural progression
+        without mentioning the skill name.
+
+    **Goal prompt template** (present as a fenced `text` block, substituting
+    `<track-id>`):
+
+    ```text
+    /goal Use the conductor-implement skill to complete track <track-id> on the current branch. Work autonomously through remaining phases, integrated verification, post-review doc sync, conductor-review, up to 2 fix rounds, PR creation, and the single completion commit that archives the track and records pr_url.
+
+    Emit CONDUCTOR_PROGRESS at every gate: phase-<n>, integrated-verification, doc-sync, review, review-fix, completion, pr-open.
+
+    Terminal proof: registry [x]; conductor/archive/<track-id>/metadata.json status complete with pr_url; verification/integrated.md committed; review.md PASS or overrides recorded; completion commit pushed; PR open.
+
+    Then emit CONDUCTOR_STOP reason=awaiting-merge pr=<url> archived=conductor/archive/<track-id> and ask me with the question tool: Merge now / Leave open / Stop. After that question, stop. Do not merge, delete branches, or continue on this goal.
+
+    Hard stops: review BLOCK after the allowed rounds, failed or blocked phase, dirty tree, closed PR, or any question-tool decision. Emit CONDUCTOR_STOP with the reason and stop. Never answer for me, merge, force-push, reset, or write outside conductor state.
+    ```
+
+    The native goal judge only trusts evidence in the transcript, so the proof
+    lines are what make autonomous completion safe. Conductor remains the sole
+    source of truth; the judge only decides whether the session takes another
+    turn.
 
 > **Registry note:** `tracks.md` and `conductor/index.md` are committed on the
 > track branch. They merge into the base branch when the track merges. A track

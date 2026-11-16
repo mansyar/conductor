@@ -340,6 +340,15 @@ The primary agent:
    The archive move is the PR's last commit, so the merged PR carries it.
    Nothing commits after the merge.
 
+At the end of `conductor-new-track`, the agent offers a ready-to-send `/goal`
+prompt for this whole flow. On OpenCode 2.2.1+, `/goal` lets the native judge
+continue the session until the objective's transcript proof is visible. The
+goal ends at PR open + completion commit: it emits `CONDUCTOR_STOP
+reason=awaiting-merge` and asks the merge question. The judge decides
+continuation only — registry, metadata, plan, evidence, and `review.md` remain
+the source of truth. On older hosts the same prompt works as a plain message
+without autonomous continuation.
+
 If `pr.watch_ci` is true in `conductor/workflow.md`, the agent then watches CI
 for up to `pr.watch_timeout_minutes` (default 15). When every check passes and
 the PR is mergeable, it asks whether to merge and uses `pr.merge_method`
