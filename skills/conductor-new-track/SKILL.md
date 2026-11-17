@@ -335,9 +335,11 @@ nothing behind.
 
     Terminal proof: registry [x]; conductor/archive/<track-id>/metadata.json status complete with pr_url; verification/integrated.md committed; review.md PASS or overrides recorded; completion commit pushed; PR open.
 
-    Then emit CONDUCTOR_STOP reason=awaiting-merge pr=<url> archived=conductor/archive/<track-id> and ask me with the question tool: Merge now / Leave open / Stop. After that question, stop. Do not merge, delete branches, or continue on this goal.
+    Then emit CONDUCTOR_STOP reason=awaiting-merge pr=<url> archived=conductor/archive/<track-id> and ask me with the question tool: Merge now / Leave open / Stop. That STOP ends the autonomous goal run only. When I answer, execute my answer directly under the skill rules: on "Merge now", perform the merge and branch cleanup (Section 8.5 steps 8-11) and emit CONDUCTOR_PROGRESS gate=merged; on "Leave open" or "Stop", report and finish. Do not treat my answer as a reason to stop without acting.
 
-    Hard stops: review BLOCK after the allowed rounds, failed or blocked phase, dirty tree, closed PR, or any question-tool decision. Emit CONDUCTOR_STOP with the reason and stop. Never answer for me, merge, force-push, reset, or write outside conductor state.
+    Never decide the merge for me, force-push, reset, or write outside conductor state. That limit governs your autonomous behavior only; it does not forbid carrying out my explicit answer.
+
+    Hard stops: review BLOCK after the allowed rounds, failed or blocked phase, dirty tree, or closed PR. Emit CONDUCTOR_STOP with the reason and stop. The merge question is the one question whose answer you execute rather than stop on.
     ```
 
     The native goal judge only trusts evidence in the transcript, so the proof

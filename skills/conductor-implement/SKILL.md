@@ -38,6 +38,7 @@ CONDUCTOR_PROGRESS gate=integrated-verification status=pass evidence=conductor/t
 CONDUCTOR_PROGRESS gate=doc-sync status=updated|none evidence=review.md
 CONDUCTOR_PROGRESS gate=completion status=archived registry=[x] metadata=conductor/archive/<id>/metadata.json pr_url=<url>
 CONDUCTOR_PROGRESS gate=pr-open url=<url> pr_state=open|unavailable
+CONDUCTOR_PROGRESS gate=merged url=<url>
 ```
 
 Emit a stop line at every defined boundary:
@@ -47,12 +48,29 @@ CONDUCTOR_STOP reason=awaiting-merge pr=<url> archived=conductor/archive/<id>
 CONDUCTOR_STOP reason=<failed|blocked|dirty-tree|closed-pr|review-block|user-question>
 ```
 
-The merge boundary is absolute: after the PR is open and the completion commit
-is pushed, ask the merge question with the question tool, emit
-`CONDUCTOR_STOP reason=awaiting-merge`, and stop. A goal never answers for the
-user, merges a PR, deletes branches on its own, force-pushes, resets, or writes
-outside conductor state. If a stop line is emitted, do not start another phase
-or re-open the flow unless the user explicitly resumes.
+The merge boundary ends only the **autonomous** run: after the PR is open and
+the completion commit is pushed, ask the merge question with the question tool,
+emit `CONDUCTOR_STOP reason=awaiting-merge`, and stop the goal. The judge sees a
+pending user decision and returns `blocked`, which pauses the goal. That is the
+intended stop, not a refusal to merge.
+
+**Deciding** to merge is always the user's; **executing** the user's answer is
+not goal continuation. When the user answers the merge question, act on that
+answer directly under the normal skill rules (Section 8.5):
+
+-   **Merge now** — perform the merge and the branch cleanup (Section 8.5
+    steps 8–11), then emit `CONDUCTOR_PROGRESS gate=merged url=<url>`.
+-   **Leave open** — emit `CONDUCTOR_STOP reason=left-open` and stop.
+-   **Stop** — emit `CONDUCTOR_STOP reason=stopped` and stop.
+
+The rule "a goal never merges a PR, deletes branches, force-pushes, resets, or
+writes outside conductor state" governs **autonomous** behavior *before* the
+answer. It does not forbid carrying out the user's explicit answer. Other stop
+lines (`failed`, `blocked`, `dirty-tree`, `closed-pr`, `review-block`,
+`user-question`) are hard boundaries: do not start another phase or re-open the
+flow unless the user explicitly asks. If the judge returns `continue` after
+`awaiting-merge`, the decision is still pending — re-ask the question; do not
+interpret `continue` as merge approval.
 
 ---
 
@@ -724,7 +742,7 @@ checks.
     sequence is explicit: the track is already archived in the completion
     commit and pushed; merging the PR is the second and final step, after
     which the branch is deleted locally and on the remote.
-    After asking, emit `CONDUCTOR_STOP reason=awaiting-merge pr=<url> archived=conductor/archive/<track-id>` and do not continue the goal until the user answers.
+    After asking, emit `CONDUCTOR_STOP reason=awaiting-merge pr=<url> archived=conductor/archive/<track-id>` and stop the goal. This stops the autonomous run only; the user's answer is a direct instruction that you then execute below — it is not a continuation of the goal.
 8.  On **Merge now**, merge with the configured method and without deleting
     branches:
     ```bash
