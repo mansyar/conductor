@@ -106,9 +106,9 @@ it reports problems and exact repair commands for the user to approve.
     ```
 3.  Read the branch's `conductor/tracks.md` when present to get the registry
     marker.
-4.  Mark each branch merged or unmerged using a merged `pr_state`/revert PR
-    state when available, otherwise `git merge-base --is-ancestor`. For a
-    squash or rebase merge without PR proof, show `unknown`; do not guess.
+4.  Mark each branch merged or unmerged with `git merge-base --is-ancestor`,
+    or a live PR `MERGED` state when queried. For a squash or rebase merge
+    without live proof, show `unknown`; do not guess.
 5.  Do not read every plan in `--all` mode; use metadata and show a note that
     only active/selected tracks are plan-verified.
 
@@ -151,8 +151,8 @@ Include a concrete `Fix:` line for every warning or error.
     tracks have no `status: running` run file. Stale run files are warnings, not
     errors.
 10. **PR consistency:** when `pr_url` or `revert_pr_url` exists, do not fetch it
-    here unless `--pr` is also set. Report that `status --pr` is available. If
-    `pr_state` is `closed` and the branch is not merged, mark it an error.
+    here unless `--pr` is also set. Report that `status --pr` is available and
+    verifies PR state live.
 
 Doctor output is a checklist, not a status table. End with:
 
@@ -179,13 +179,14 @@ For each track in the current report that has a `pr_url`, and each
     -   otherwise → checks passing or none
 4.  Query at most 10 PRs. Prioritize active and selected tracks. If more remain,
     list them as `not queried` and suggest `status --pr <track>`.
-5.  If the configured tool is missing, unauthenticated, or the network fails, keep the local
-    `pr_state` and add a warning. Do not block the status report.
+5.  If the configured tool is missing, unauthenticated, or the network fails, report PR state
+    as `unknown` (or `not queried`) and add a warning. Do not block the status report.
 6.  Do not poll, wait, rerun checks, or mutate the PR.
-7.  If the configured tool reports `MERGED` but metadata still says `open`, show the track as
-    merged and use "Run conductor-implement cleanup" as the next action. If
-    `gh` reports `CLOSED` without merge, show drift. Do not rewrite metadata
-    from a read-only status command.
+7.  If the configured tool reports `MERGED`, show the track as merged and use
+    "Run conductor-implement cleanup" as the next action. If it reports `CLOSED`
+    without merge, show drift. PR state is never stored in metadata; a live
+    query is always authoritative. Do not rewrite metadata from a read-only
+    status command.
 
 ---
 
@@ -228,7 +229,7 @@ States are factual, not schedule-based.
 | `fixes` | Review is `BLOCK`, a review-fix phase is pending, or review is `SUPERSEDED`. |
 | `doc_sync` | Review passed; post-review documentation sync is pending. |
 | `pr_open` | Complete, PR open, awaiting review/merge. |
-| `complete` | Complete and merged, complete with no remote, `pr.enabled: false`, or PR creation recorded as unavailable. A closed unmerged PR is not complete. Complete tracks live in `conductor/archive/` and keep their registry line. |
+| `complete` | Complete and merged, or complete with no remote or `pr.enabled: false` (no PR expected). A closed unmerged PR is not complete. Complete tracks live in `conductor/archive/` and keep their registry line. |
 | `reverted` | Track was reverted after merge; registry marker `[-]`. |
 | `abandoned` | Track was abandoned before merge; registry marker `[-]` or entry removed. |
 | `drift` | Registry, metadata, plan, and git state disagree. Show the conflict; do not guess. |
@@ -248,14 +249,15 @@ Derivation order:
     -   no review verdict → `in_review`
     -   review passed and `metadata.doc_sync` is `pending` → `doc_sync`
     -   review passed and `metadata.doc_sync` is `updated` or `none`:
-        -   `pr_state: "open"` → `pr_open`
-        -   `pr_state: "closed"` and the branch is not merged → `drift`
-        -   `pr_state: "closed"` and the branch is merged → `complete` (warn:
-            PR closed but the branch is merged)
-        -   `pr_state: "merged"`, `pr_state: "unavailable"`, no remote, or
-            `pr.enabled: false` → `complete`
-        -   `pr_state: null` with a remote and `pr.enabled: true` → `drift`
-            (PR state missing; next action: open PR)
+        -   no remote, or `pr.enabled: false` → `complete` (no PR expected)
+        -   `pr_url` set, live state `MERGED` → `complete`
+        -   `pr_url` set, live state `CLOSED` and the branch is merged →
+            `complete` (warn: PR closed but the branch is merged)
+        -   `pr_url` set, live state `CLOSED` and the branch is not merged →
+            `drift`
+        -   `pr_url` set, live state `OPEN` or not queried → `pr_open`
+        -   `pr_url: null` with a remote and `pr.enabled: true` → `drift`
+            (no PR recorded; next action: open PR)
 7.  `[~]` or metadata `in_progress` → `in_progress`.
 8.  `[ ]` with no started phases → `ready` if dependencies are met, otherwise
     `blocked`.
@@ -287,19 +289,18 @@ Derive one concrete next action per track:
     -   checks pending → "Wait for checks".
     -   otherwise → "Await review/merge".
 -   `complete`:
-    -   `pr_state: "unavailable"` → "Open the PR manually".
     -   not archived (legacy layout) → "Archive the track directory on the
         base branch (legacy layout)".
     -   branch exists and merge is proven → "Run conductor-implement cleanup".
     -   otherwise → "None".
--   `reverted` with `pr_state: "unavailable"` → "Open the revert PR manually".
--   `reverted` with `pr_state: "merged"` and no `archived_at` → "Archive the
+-   `reverted` with `revert_pr_url: null`, a remote, and `pr.enabled: true` →
+    "Open the revert PR manually".
+-   `reverted` with a proven revert merge and no `archived_at` → "Archive the
     track directory on the base branch (legacy layout)".
--   `reverted` with `revert_pr_url` or `pr_state: "open"` → "Review and merge
-    revert PR".
+-   `reverted` with `revert_pr_url` → "Review and merge revert PR".
 -   `reverted` / `abandoned` otherwise → "None".
 -   `drift` with a closed unmerged PR → "Reopen the PR or reopen the track".
--   `drift` with a remote, `pr.enabled: true`, and no PR state → "Open PR".
+-   `drift` with a remote, `pr.enabled: true`, and no `pr_url` → "Open PR".
 -   If a track is `[x]` but its branch is not merged → "Drift: branch not
     merged".
 
@@ -333,7 +334,7 @@ Report every mismatch; never hide or auto-fix it:
 -   Duplicate track IDs or duplicate registry entries.
 -   Empty or unparsable plan for an active track.
 -   PR state mismatch when the configured PR tool confirms a different state.
--   Complete with a remote and `pr.enabled: true` but `pr_state: null`.
+-   Complete with a remote and `pr.enabled: true` but `pr_url: null`.
 -   `updated_at` older than 14 days on an active or review track (stale, not
     "behind schedule").
 
@@ -394,8 +395,8 @@ an empty progress report.
     default.
 -   **`--pr`:** query every track in the current report with a `pr_url` or
     `revert_pr_url`, subject to the 10-PR cap in Section 3.4.
--   If `gh` is missing, unauthenticated, or the network fails, show the local
-    `pr_state` and add a note. Do not block the report.
+-   If `gh` is missing, unauthenticated, or the network fails, show PR state as
+    `unknown` and add a note. Do not block the report.
 -   Use `statusCheckRollup` for the check summary; do not paste raw JSON.
 -   Do not poll, wait, rerun checks, or mutate the PR.
 

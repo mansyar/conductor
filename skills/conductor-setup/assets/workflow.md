@@ -285,8 +285,9 @@ A track is complete when:
 4. Post-review documentation sync is complete.
 5. The registry and `metadata.json` show the track as complete.
 6. When a remote exists, the branch is pushed. When `pr.enabled` is true, a PR
-   is open or `pr_state: "unavailable"` records that PR creation could not run.
-   When `pr.enabled` is false, no PR is expected.
+   is open (`pr_url` is set); if PR creation could not run, `pr_url` is null and
+   the failure is reported in the completion message. When `pr.enabled` is
+   false, no PR is expected.
 
 ## Emergency Procedures
 

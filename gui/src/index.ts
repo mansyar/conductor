@@ -288,7 +288,6 @@ export default Plugin.define({
             branch: metadata?.branch ?? "",
             base_branch: metadata?.base_branch ?? "",
             pr_url: metadata?.pr_url ?? null,
-            pr_state: metadata?.pr_state ?? null,
             archived,
             hasMetadata: metadata !== null,
             nextAction: NEXT_ACTION[effective] ?? "",
@@ -445,14 +444,14 @@ export default Plugin.define({
                     .join(", ")
 
             pr = {
-              state: view.state ?? metadata.pr_state ?? "unknown",
+              state: view.state ?? "unknown",
               mergeable: view.mergeable ?? null,
               checks,
               url,
             }
           } catch {
             pr = {
-              state: metadata.pr_state ?? "unknown",
+              state: "unknown",
               mergeable: null,
               checks: "unknown",
               url,

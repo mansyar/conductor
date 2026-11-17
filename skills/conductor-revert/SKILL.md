@@ -86,12 +86,12 @@ tree.
 -   `branch_exists`: `git show-ref --verify --quiet refs/heads/<branch>`.
 -   `merged_into_base`:
     -   If the branch exists, `git merge-base --is-ancestor <branch> <base>`.
-    -   If the branch was deleted, use `pr_state` and `git log <base>` for the
-      merge or squash commit.
--   `pr_state`: read metadata. If the configured `pr.tool` is available and
-    `pr_url` exists, use its PR/MR view command (`gh pr view <url> --json
-    state,mergeCommit` for GitHub) to confirm. Do not block on a network or auth
-    failure; report that the local state is being used.
+    -   If the branch was deleted, use `git log <base>` for the merge or squash
+      commit, plus the live PR state when `pr_url` exists.
+-   Live PR state: if the configured `pr.tool` is available and `pr_url` exists,
+    use its PR/MR view command (`gh pr view <url> --json state,mergeCommit` for
+    GitHub) to confirm the merge. Do not block on a network or auth failure;
+    report that the state could not be confirmed.
 
 ### 3.3 Phase Revert Preflight
 
@@ -366,10 +366,9 @@ Use a reviewed revert PR.
       --body-file <resolved-track-dir>/revert-pr.md
     ```
     For `glab`, use the equivalent merge-request command. If PR creation fails,
-    stop and leave the revert branch for inspection. Set `pr_state:
-    "unavailable"` in a metadata-only commit, leave `revert_pr_url` null, and
-    report that the revert PR must be opened manually.
-12. Record `revert_pr_url` and `pr_state: "open"` in metadata, commit
+    stop and leave the revert branch for inspection. Leave `revert_pr_url`
+    null and report that the revert PR must be opened manually.
+12. Record `revert_pr_url` in metadata, commit
     `conductor(revert): Record revert PR for track '<track-id>'`, and push. This
     is metadata-only and does not require re-review.
 13. The revert PR body covers:

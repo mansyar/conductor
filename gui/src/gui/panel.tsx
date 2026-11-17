@@ -32,7 +32,6 @@ interface Track {
   branch: string
   base_branch: string
   pr_url: string | null
-  pr_state: string | null
   archived: boolean
   hasMetadata: boolean
   nextAction: string

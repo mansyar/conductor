@@ -37,7 +37,7 @@ CONDUCTOR_PROGRESS gate=phase-<n> status=verified evidence=<path> checkpoint=<sh
 CONDUCTOR_PROGRESS gate=integrated-verification status=pass evidence=conductor/tracks/<id>/verification/integrated.md
 CONDUCTOR_PROGRESS gate=doc-sync status=updated|none evidence=review.md
 CONDUCTOR_PROGRESS gate=completion status=archived registry=[x] metadata=conductor/archive/<id>/metadata.json pr_url=<url>
-CONDUCTOR_PROGRESS gate=pr-open url=<url> pr_state=open|unavailable
+CONDUCTOR_PROGRESS gate=pr-open url=<url|null>
 CONDUCTOR_PROGRESS gate=merged url=<url>
 ```
 
@@ -219,12 +219,11 @@ Validate that:
 -   A phase ID → that phase must have `**Status:** verified`.
 -   A track ID → resolve it in `tracks.md`; read its metadata from
     `conductor/tracks/<track-id>/` or, for `[x]` and `[-]` entries, from
-    `conductor/archive/<track-id>/`. The dependency is satisfied
-    only when `metadata.status` is `complete` and the merge is proven
-    (`pr_state: "merged"`, or the dependency's merge commit is an ancestor of
-    the current base — verify live with the configured `pr.tool`,
-    `gh pr view`, when in doubt). A `legacy`, `reverted`, or `abandoned`
-    dependency is not satisfied.
+    `conductor/archive/<track-id>/`. The dependency is satisfied only when
+    `metadata.status` is `complete` and its merge commit is an ancestor of the
+    current base, verified live with the configured `pr.tool` (`gh pr view`)
+    when in doubt. A `legacy`, `reverted`, or `abandoned` dependency is not
+    satisfied.
 
 If a dependency is unmet, stop and explain which phase or track is blocking.
 
@@ -612,12 +611,11 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
 ### 8.3 Push and Open the PR
 
 1.  Detect a remote with `git remote`. If there is no remote, go to Section 8.4
-    with `pr_url: null` and `pr_state: null`; the completion commit is the
-    deliverable.
+    with `pr_url: null`; the completion commit is the deliverable.
 2.  Push: `git push -u origin <branch>` (or `git push` when the upstream is
     already set).
-3.  Read `pr.enabled`. If it is false, go to Section 8.4 with `pr_url: null` and
-    `pr_state: null`; the pushed branch is the deliverable.
+3.  Read `pr.enabled`. If it is false, go to Section 8.4 with `pr_url: null`;
+    the pushed branch is the deliverable.
 4.  If `pr.enabled` is true, use `pr.tool` from the Workflow Config. Default:
     `gh`. Build the title `<type>(<scope>): <track title>` and use
     `pr.base or base_branch` as the base.
@@ -634,7 +632,7 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
         -   `OPEN`: update the body with
             `gh pr edit <url> --body-file conductor/tracks/<track-id>/pr.md`,
             adding `--attach <media path>` when media was captured.
-        -   `MERGED`: continue to Section 8.4 with `pr_state: "merged"`.
+        -   `MERGED`: record its URL in `pr_url` and continue to Section 8.4.
         -   `CLOSED`: stop and ask whether to reopen it or open a new PR. Do not
             make the completion commit while the PR is closed and unmerged.
     -   **Create:**
@@ -655,8 +653,7 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
         title, and body. Apply the same `OPEN`/`MERGED`/`CLOSED` handling.
         Media is not uploaded for `glab`.
     -   **Other tool:** do not invent commands. Treat PR creation as
-        unavailable and continue to Section 8.4 with `pr_state:
-        "unavailable"`.
+        unavailable and continue to Section 8.4 with `pr_url: null`.
 5.  Refresh the PR body file when a PR was created or updated: run
     `gh pr view <url> --json body` and write the `body` value to
     `conductor/tracks/<track-id>/pr.md` with the file write tool, not a shell
@@ -665,15 +662,15 @@ diff. Write `conductor/tracks/<track-id>/pr.md`.
 6.  If `gh` exits non-zero but prints a PR URL, the PR exists with the
     attachments that succeeded. Report that, keep the PR URL, and continue.
 7.  If the configured tool is missing, unauthenticated, or fails, treat PR
-    creation as unavailable and continue to Section 8.4 with
-    `pr_state: "unavailable"`. Give the user the host's compare URL:
+    creation as unavailable and continue to Section 8.4 with `pr_url: null`.
+    Give the user the host's compare URL:
     -   GitHub:
         `https://github.com/<owner>/<repo>/compare/<base>...<branch>?expand=1`
     -   GitLab: the equivalent merge-request URL for the repository.
 8.  Do not poll for merge here. Section 8.5 watches only when `pr.watch_ci` is
     true. Never merge the PR without an explicit confirmation asked via the question tool.
 9.  Emit a transcript-visible line:
-    `CONDUCTOR_PROGRESS gate=pr-open url=<pr_url|null> pr_state=<open|merged|unavailable|null>`.
+    `CONDUCTOR_PROGRESS gate=pr-open url=<pr_url|null>`.
 
 ### 8.4 Complete and Archive
 
@@ -689,13 +686,8 @@ made after it, before or after the merge.
     -   `archived_at` and `archive_path: "conductor/archive/<track-id>"`
     -   `updated_at`
     -   `pr_url`: the PR URL from Section 8.3, or `null` when there is no PR.
-    -   `pr_state`: `"open"` when the PR was created or updated, `"merged"`
-        when it was already merged, `"unavailable"` when creation was
-        configured but failed, or `null` when no PR is expected. This field
-        is write-once: record the state at completion time and never amend
-        this file after the merge. Merge state after completion is always
-        verified live via `pr_url`; do not add a post-merge commit to update
-        this field.
+        PR state is not stored; verify it live via `pr_url`. Never amend this
+        file after the merge: there is no post-merge commit.
 4.  Stage the archive directory and `conductor/tracks.md`. Commit:
     `chore(conductor): Complete and archive track '<track-id>'`.
 5.  Push when a remote exists. This commit must touch only `conductor/**`;
@@ -955,9 +947,9 @@ Wait for PR checks and offer a merge without redoing completion.
 1.  Resolve the track: the named track, otherwise the `[x]` track on the current
     branch, otherwise ask. Read metadata from `conductor/tracks/<track-id>/`
     first, then `conductor/archive/<track-id>/`.
-2.  Require `pr_url` and `pr_state: "open"`. If the PR is already merged, report
-    it and offer cleanup instead. If `pr_url` is missing, report that no PR was
-    recorded and stop.
+2.  Require `pr_url`. Query the live PR state with the configured `pr.tool`.
+    If the PR is already merged, report it and offer cleanup instead. If
+    `pr_url` is missing, report that no PR was recorded and stop.
 3.  Run Section 8.5. Ignore `pr.watch_ci` here: an explicit `watch` request is
     the opt-in.
 
