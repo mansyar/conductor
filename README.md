@@ -189,7 +189,7 @@ A missing key is not a problem in the meantime. Every optional key has a
 documented default, so a project configured before a key existed keeps working:
 `conductor-implement`, `conductor-status`, and `conductor-revert` each apply
 the default when a key is absent (`pr.media` → `always`, `pr.watch_ci` →
-`false`, `pr.merge_method` → `squash`, `pr.base` → `git.base_branch`, and so
+`false`, `pr.merge_method` → `merge`, `pr.base` → `git.base_branch`, and so
 on).
 
 --------------------------------------------------------------------------------
@@ -355,11 +355,11 @@ without autonomous continuation.
 If `pr.watch_ci` is true in `conductor/workflow.md`, the agent then watches CI
 for up to `pr.watch_timeout_minutes` (default 15). When every check passes and
 the PR is mergeable, it asks whether to merge and uses `pr.merge_method`
-(default `squash`). It never merges without your answer, never bypasses required
-review, and stops watching when the cap is reached. After an approved merge it
-deletes the track branch locally and on the remote without asking again, then
-continues with cleanup. You can run the same watch later without redoing
-completion:
+(default `merge`, a merge commit). It never merges without your answer, never
+bypasses required review, and stops watching when the cap is reached. After an
+approved merge it deletes the track branch locally and on the remote without
+asking again, then continues with cleanup. You can run the same watch later
+without redoing completion:
 
 ```bash
 /conductor:conductor-implement watch

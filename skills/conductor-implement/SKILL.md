@@ -101,7 +101,7 @@ interpret `continue` as merge approval.
         keeps working without a refresh. `pr.enabled` → `true`, `pr.tool` →
         `gh`, `pr.base` → `git.base_branch`, `pr.media` → `always`,
         `pr.watch_ci` → `false`, `pr.watch_timeout_minutes` → `15`,
-        `pr.merge_method` → `squash`, `git.base_branch` → `main`,
+        `pr.merge_method` → `merge`, `git.base_branch` → `main`,
         `git.fetch` → `true`.
 4.  **Load Style Guides:** List `conductor/code_styleguides/`. Pass the relevant
     guides to the phase subagent.
@@ -747,10 +747,10 @@ checks.
 8.  On **Merge now**, merge with the configured method and without deleting
     branches:
     ```bash
-    gh pr merge <url> --squash
+    gh pr merge <url> --merge
     ```
-    Use `--merge` or `--rebase` when `pr.merge_method` says so; default
-    `squash`. Never pass `--admin`, `--auto`, or `--delete-branch`. Branch
+    Use `--squash` or `--rebase` when `pr.merge_method` says so; default
+    `merge`. Never pass `--admin`, `--auto`, or `--delete-branch`. Branch
     deletion stays in Section 9.3.
 9.  For `glab`, use `glab mr view` and `glab mr merge` with the same checks and
     the same confirmation.
@@ -764,8 +764,10 @@ checks.
     -   If the current branch is the merged branch, check out the base branch.
         When the base is checked out in another worktree, detach this worktree's
         HEAD (`git checkout --detach`) and continue.
-    -   `git branch -d <branch>`. When `-d` refuses because the merge was a
-        squash or rebase, use `git branch -D <branch>`.
+    -   `git branch -d <branch>`. With a merge commit the branch tip is an
+        ancestor of the base, so `-d` succeeds. If the configured method was
+        `squash` or `rebase` (the tip is not an ancestor) and `-d` refuses, use
+        `git branch -D <branch>`.
     -   If deletion fails because the branch is checked out in another
         worktree, detach that worktree when it is not the main worktree and
         retry; if it is the main worktree, report it and leave the branch.
