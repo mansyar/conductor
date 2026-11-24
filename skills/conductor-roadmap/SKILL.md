@@ -21,9 +21,11 @@ the track's actual state.
         error, self-correct once, or halt and ask.
 -   **Path Integrity:** Use relative paths from the project root
         (e.g., `conductor/roadmap.md`).
--   **Single Writer:** Only this skill writes `conductor/roadmap.md`. Other
-        skills invoke its `follow-up` operation rather than hand-editing the
-        file. `conductor-status` reads it only.
+-   **Single Writer:** Only this skill defines writes to `conductor/roadmap.md`.
+        Other skills invoke its `follow-up`, `drop`, or `retire` operations
+        rather than hand-editing the file. The one inline exception is `retire`,
+        which `conductor-implement` performs inside its completion commit using
+        the exact rule in §3.7. `conductor-status` reads it only.
 -   **No Live State:** Never add a column or field that duplicates a track's
         `status`, PR state, or progress. The `track` column is a link, not a
         status cache.
@@ -49,8 +51,12 @@ the track's actual state.
         `conductor-roadmap/assets/roadmap-template.md`. If the user agrees,
         copy the template, then continue. If declined, HALT.
 4.  **Parse the File:** Read the four sections (`Now`, `Next`, `Later`,
-        `Dropped`) and their table rows. Track the highest `RM-<n>` id seen so
-        new ids are monotonic and never reused, including ids in `Dropped`.
+        `Dropped`) and their table rows, and the `<!-- next-rm-id: <n> -->`
+        comment near the top. New ids are monotonic and never reused, including
+        ids of retired rows that are no longer in the file. The comment is the
+        high-water mark: take the maximum of it and the highest id present, and
+        update the comment whenever a new id is assigned. If the comment is
+        absent (an older roadmap), add it.
 
 ## 2. Entry Model
 
@@ -66,20 +72,29 @@ Each row has these columns (Dropped rows use `id | title | reason`):
         follow-up (e.g., `review:20261124-oauth-login`).
 
 Buckets: **Now** = committed near-term work, **Next** = queued and ready to
-promote, **Later** = parked ideas, **Dropped** = closed without implementing.
+promote, **Later** = parked ideas, **Dropped** = closed without implementing,
+including abandoned tracks (with an `abandoned after <track-id>` reason).
+
+The roadmap is **forward-looking**. When a track completes, its row is retired
+(§3.7) in the same completion commit that archives the track — shipped history
+lives in `conductor/tracks.md`, the archived metadata, and the PR, not here.
+Never add a Done or Completed bucket.
 
 ## 3. Operations
 
 Determine the requested operation. If it is ambiguous, ask with a
 single-choice question: **add**, **refine**, **promote**, **drop**, or
-**show**. For each mutating operation, show the resulting row before committing.
+**show**. The internal operations **follow-up** (§3.5) and **retire** (§3.7) are
+invoked by other skills, not chosen here. For each mutating operation, show the
+resulting row before committing.
 
 ### 3.1 Add
 
 1.  Collect `title` (required). If absent, ask for it. Ask for `bucket`
     (default from config), `type`, `priority` (default from config), and
     `depends_on` only when the user volunteers them; otherwise use defaults.
-2.  Assign the next `RM-<n>` id. Set `origin: user`, `track: —`.
+2.  Assign the next `RM-<n>` id from the high-water mark (§1.4) and advance the
+    `next-rm-id` comment in the same commit. Set `origin: user`, `track: —`.
 3.  Append the row to the target bucket, then sort that bucket by priority
     (`high` → `medium` → `low`), keeping the user's relative order inside a
     priority tier.
@@ -107,8 +122,10 @@ single-choice question: **add**, **refine**, **promote**, **drop**, or
     entry, and leaves you on the new track branch.
 5.  Write the resulting track id into the row's `track` column. This is a
     metadata-only commit on the current branch and rides into the base branch
-    when the track's PR merges. If that PR is abandoned, `conductor-status`
-    drift checks will flag the dangling link.
+    when the track's PR merges. The link is temporary: `conductor-implement`
+    retires the row in its completion commit (§3.7). If the PR is abandoned,
+    `conductor-revert` moves the row to `Dropped` with an
+    `abandoned after <track-id>` reason instead.
 6.  Commit: `chore(conductor): link roadmap item RM-<n> to track <track-id>`.
 7.  Report the new track id to the user.
 
@@ -118,7 +135,9 @@ single-choice question: **add**, **refine**, **promote**, **drop**, or
     roadmap entry does not abandon the track, and ask for confirmation.
 2.  Ask for a one-line `reason` if not supplied.
 3.  Move the row from its bucket to `Dropped`, recording `reason`. Never delete
-    it silently — losing the decision is worse than keeping the line.
+    it silently — losing the decision is worse than keeping the line. For an
+    abandoned track (invoked by `conductor-revert`), use the reason
+    `abandoned after <track-id>`.
 4.  Commit: `chore(conductor): drop roadmap item RM-<n>`.
 
 ### 3.5 Follow-up (internal capture)
@@ -127,8 +146,10 @@ Called by `conductor-implement`, `conductor-review`, or `conductor-new-track`
 when out-of-scope work surfaces. The caller supplies a `title` and an `origin`
 track id.
 
-1.  Assign the next `RM-<n>` id. Set `bucket: Next`, `origin: <caller>:<track-id>`,
-    `depends_on: <origin-track-id>`, `priority: medium`, `track: —`.
+1.  Assign the next `RM-<n>` id from the high-water mark (§1.4) and advance the
+    `next-rm-id` comment in the same commit. Set `bucket: Next`,
+    `origin: <caller>:<track-id>`, `depends_on: <origin-track-id>`,
+    `priority: medium`, `track: —`.
 2.  Append and sort the row; commit
     `chore(conductor): capture follow-up RM-<n> from <origin>`.
 3.  Return the new `RM-<n>` id to the caller so it can report it.
@@ -146,13 +167,31 @@ its track: read `conductor/tracks/<track-id>/metadata.json` and the
 -   `status: reverted` / `[-]` → `abandoned`
 -   track dir or metadata missing → `missing` (a drift warning)
 
+### 3.7 Retire (internal, on completion)
+
+Called by `conductor-implement` in its single completion commit, which archives
+the track and is the last commit on the branch. The caller supplies a `track` id.
+
+1.  Find the row in `Now`, `Next`, or `Later` whose `track` cell equals the given
+    track id. Ignore `Dropped` rows. If the file is absent, no row matches, or
+    more than one row matches, make no change and report that fact.
+2.  Delete that one row. Never renumber ids, never touch other rows, never add a
+    Done or Completed section. A finished idea leaves the forward-looking
+    roadmap; the registry, archived metadata, and PR keep the shipped history.
+3.  The deletion is staged and committed as part of the caller's
+    `chore(conductor): Complete and archive track '<track-id>'` commit — not as
+    a separate roadmap commit. Use §5 only to determine what is staged.
+
 ## 4. Drift Reconciliation
 
 These checks are shared with `conductor-status` (which runs them read-only).
 Report warnings; never auto-fix, because the roadmap records intent.
 
 -   Promoted entry whose track directory or metadata is missing.
--   Promoted entry that is `complete` or `abandoned` but still in `Now`/`Next`.
+-   Promoted entry whose track is `complete` but whose row is still in `Now`,
+    `Next`, or `Later` — completion should have retired it (§3.7).
+-   Promoted entry whose track is `abandoned` but whose row is still in a
+    forward bucket — it should be in `Dropped` with an abandonment reason.
 -   Entry in `Now` with no `track` and no clear next action (informational).
 -   `depends_on` referencing a `Dropped` `RM-<n>` or a complete/abandoned track.
 -   `priority` or `depends_on` in the roadmap row differing from the track's
@@ -162,5 +201,7 @@ Report warnings; never auto-fix, because the roadmap records intent.
 ## 5. Commit Scope
 
 Stage only `conductor/roadmap.md` and `conductor/index.md` if changed. Use the
-commit messages above. Never stage unrelated files or start a track as a side
-effect (except `promote`, which does so explicitly via `conductor-new-track`).
+commit messages above. The `retire` operation is the exception: its deletion
+rides the caller's completion commit and has no roadmap-only commit. Never stage
+unrelated files or start a track as a side effect (except `promote`, which does
+so explicitly via `conductor-new-track`).

@@ -55,9 +55,10 @@ branch-and-evidence workflow:
     changing it.
 -   **PR and CI visibility.** `conductor-status --pr` shows PR state, mergeability,
     review decision, and checks without polling.
--   **A living roadmap.** `conductor/roadmap.md` captures ideas and follow-ups in
-    Now / Next / Later buckets. Entries store intent only; `conductor-status
-    --roadmap` joins them to live track state and reports drift.
+-   **A forward-looking roadmap.** `conductor/roadmap.md` captures ideas and
+    follow-ups in Now / Next / Later buckets. Entries store intent only;
+    `conductor-status --roadmap` joins them to live track state and reports
+    drift, and completed items are retired from the roadmap on merge.
 -   **No git notes.** Task summaries live in the plan and the evidence files.
 
 --------------------------------------------------------------------------------
@@ -494,13 +495,13 @@ commands but never applies them.
 with a PR URL. It does not poll or rerun checks.
 
 `--roadmap` renders the roadmap buckets with each promoted entry joined to its
-live track state and runs read-only drift checks (dangling links, stale buckets,
-unmet or dropped dependencies). It never writes the roadmap.
+live track state and runs read-only drift checks (dangling links, unretired
+rows, unmet or dropped dependencies). It never writes the roadmap.
 
 ### 7. Roadmap
 
 `conductor/roadmap.md` is the single place for ideas and follow-ups that are not
-yet real tracks. The `conductor-roadmap` skill is its only writer:
+yet real tracks. The `conductor-roadmap` skill defines every write to it:
 
 ```bash
 /conductor:conductor-roadmap                 # show
@@ -511,10 +512,14 @@ yet real tracks. The `conductor-roadmap` skill is its only writer:
 ```
 
 Rows live in `Now`, `Next`, `Later`, or `Dropped` buckets with a monotonic
-`RM-<n>` id, type, priority, `depends_on`, a `track` link once promoted, and an
-`origin` (`idea`, `manual`, `<skill>:<track-id>`) so follow-ups are traceable.
-The roadmap records *intent*, not live state — status derives the real state by
-joining the `track` link to `tracks.md` and track metadata.
+`RM-<n>` id (a `next-rm-id` comment keeps ids from being reused after rows are
+retired), type, priority, `depends_on`, a `track` link once promoted, and an
+`origin` (`user`, `<skill>:<track-id>`) so follow-ups are traceable. The roadmap
+records *intent*, not live state — status derives the real state by joining the
+`track` link to `tracks.md` and track metadata. It is forward-looking: when a
+track completes, its row is removed in the completion commit (no Done bucket);
+an abandoned track's row moves to `Dropped` with an
+`abandoned after <track-id>` reason.
 
 `conductor-new-track` prefills classification from a promoted row (skipping the
 type/priority questions), `conductor-implement` and `conductor-review` auto-capture
@@ -560,7 +565,7 @@ There is no `git reset --hard` path.
 | `conductor/workflow.md` | Workflow Config, verification strategy, quality gates. |
 | `conductor/code_styleguides/` | Applicable style guides. |
 | `conductor/tracks.md` | Registry: `[ ]`, `[~]`, `[x]`, `[-]`. |
-| `conductor/roadmap.md` | Ideas and follow-ups in Now / Next / Later / Dropped buckets. |
+| `conductor/roadmap.md` | Forward-looking ideas and follow-ups in Now / Next / Later / Dropped buckets. |
 | `conductor/tracks/<id>/spec.md` | Stable `FR`/`NFR`/`AC` requirements. |
 | `conductor/tracks/<id>/plan.md` | Phases, tasks, checkpoints, results, evidence. |
 | `conductor/tracks/<id>/metadata.json` | Branch, base, progress cache, review/PR state. |

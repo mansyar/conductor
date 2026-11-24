@@ -500,7 +500,8 @@ phase contract — a bug outside `Touches`, a follow-up, or a future improvement
 do not expand the track to absorb it. Invoke the `conductor-roadmap` skill's
 `follow-up` operation with a one-line `title` and `origin: implement:<track-id>`.
 It captures a `Next` roadmap item tagged with its origin. Report the new
-`RM-<n>` id to the user. Never hand-edit `conductor/roadmap.md` yourself.
+`RM-<n>` id to the user. Never hand-edit `conductor/roadmap.md` for a follow-up;
+the only inline roadmap edit is retiring this track's row in §8.4.
 
 ---
 
@@ -697,13 +698,22 @@ made after it, before or after the merge.
     -   `pr_url`: the PR URL from Section 8.3, or `null` when there is no PR.
         PR state is not stored; verify it live via `pr_url`. Never amend this
         file after the merge: there is no post-merge commit.
-4.  Stage the archive directory and `conductor/tracks.md`. Commit:
+4.  Retire this track's roadmap row. Follow `conductor-roadmap` §3.7 `retire`:
+    delete the row in `Now`, `Next`, or `Later` whose `track` cell is
+    `<track-id>`. If the file is absent, no row matches, or the match is
+    ambiguous, leave it untouched and say so. Never touch other rows or add a
+    "Done" section — the roadmap is forward-looking. The registry, archive
+    metadata, and PR keep the shipped history.
+5.  Stage the archive directory, `conductor/tracks.md`, and
+    `conductor/roadmap.md` when step 4 changed it. Commit:
     `chore(conductor): Complete and archive track '<track-id>'`.
-5.  Push when a remote exists. This commit must touch only `conductor/**`;
+    If the PR merge later conflicts on `conductor/roadmap.md`, keep the base's
+    other rows and this track's row removed.
+6.  Push when a remote exists. This commit must touch only `conductor/**`;
     cleanup relies on that when it compares the branch tip with the PR head.
-6.  Emit a transcript-visible line:
+7.  Emit a transcript-visible line:
     `CONDUCTOR_PROGRESS gate=completion status=archived registry=[x] metadata=conductor/archive/<track-id>/metadata.json`.
-7.  Do not poll for merge. Section 8.5 watches only when `pr.watch_ci` is true.
+8.  Do not poll for merge. Section 8.5 watches only when `pr.watch_ci` is true.
     Never merge the PR without an explicit confirmation asked via the question tool.
 
 ### 8.5 Watch CI and Offer a Merge

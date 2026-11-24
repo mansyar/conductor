@@ -209,6 +209,8 @@ to its track's real state. Never write to the roadmap.
     no `track` → `idea`; `new`/`[ ]` → `scheduled`; `in_progress`/`[~]` →
     `in progress`; `complete`/`[x]` → `complete`; `reverted`/`[-]` →
     `abandoned`; missing track dir or metadata → `missing` (a drift warning).
+    A row whose effective state is `complete` or `abandoned` is itself drift:
+    completion retires the row and abandonment moves it to `Dropped`.
 3.  Render buckets in order (`Now`, `Next`, `Later`), and inside each bucket
     sort by priority (`high` → `medium` → `low`) then by the row's file order.
     Show `depends_on` and flag any dependency that is unmet, dropped, or
@@ -368,8 +370,10 @@ Report every mismatch; never hide or auto-fix it:
     `conductor-setup` or `conductor-roadmap`).
 -   A roadmap entry whose `track` points to a missing track directory or
     metadata (dangling link).
--   A roadmap entry whose track is `complete` or `abandoned` but whose entry is
-    still in `Now` or `Next` (stale bucket).
+-   A roadmap row whose track is `complete` but whose row is still in `Now`,
+    `Next`, or `Later` — completion should have retired it.
+-   A roadmap row whose track is `abandoned` but whose row is still in a
+    forward bucket — it should be in `Dropped` with an abandonment reason.
 -   A roadmap `depends_on` referencing a `Dropped` `RM-<n>` or a
     complete/abandoned track (unmet dependency).
 -   A roadmap row's `priority` or `depends_on` differing from the track's

@@ -281,10 +281,19 @@ Use branch deletion, not `git revert`.
         the directory is kept.
     -   No plan edit is needed when the scaffold lived only on the deleted
         branch.
+    -   If the track has a roadmap row, invoke `conductor-roadmap` `drop` with
+        reason `abandoned after <track-id>` so the row moves to `Dropped`. The
+        base branch is already checked out (above); include the change in the
+        abandonment commit when one is made, or commit it separately as
+        `chore(conductor): drop roadmap item RM-<n>`. Never hand-edit the
+        roadmap.
 4.  If the choice is **Close PR only**:
     -   Keep the branch and the track scaffold.
     -   Set metadata `status: "abandoned"` and `reverted_at`.
     -   Change the registry marker to `[-]`.
+    -   If the track has a roadmap row, invoke `conductor-roadmap` `drop` with
+        reason `abandoned after <track-id>` and include the change in the
+        abandonment commit below. Never hand-edit the roadmap.
     -   Commit `conductor(revert): Mark track '<track-id>' as abandoned` and
         optionally push.
     -   Stop. Do not delete the branch.
