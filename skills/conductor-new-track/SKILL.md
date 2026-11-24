@@ -58,20 +58,33 @@ Before starting the planning process, you MUST locate and read the project's fou
 
 Adhere to this sequence precisely.
 
+### Prefilled Promotion (from `conductor-roadmap`)
+
+When `conductor-roadmap` invokes this skill to promote an idea, it supplies a
+prefilled `title`, `type`, `priority`, and `depends_on`. These classification
+fields are already decided: use the supplied `title` as the description in
+§2.1 step 1, skip the type/priority confirmation questions in steps 2 and 3,
+and seed the spec's track dependencies with the supplied `depends_on`. Still
+generate the track ID, announce the plan, and run the full spec/plan interview
+from §2.2 onward. If the interview changes the scope, update the classification
+and tell the user the roadmap row will be refined after promotion.
+
 ### 2.1 Track Description & Classification
 
 1.  **Acquire Track Description:**
-    -   If the task description was not provided in the initial request, ask the
-        user an **open question** via the question tool to provide a brief description of the track
-        (e.g., MVP/initial implementation, feature, bug fix, chore, refactor)
-        they wish to start.
+    -   If a `title` was prefilled by `conductor-roadmap`, use it as the
+        description. Otherwise, if the task description was not provided in the
+        initial request, ask the user an **open question** via the question tool
+        to provide a brief description of the track (e.g., MVP/initial
+        implementation, feature, bug fix, chore, refactor) they wish to start.
 2.  **Infer & Confirm Type:** Analyze the description to determine the track
     type (`mvp`, `feature`, `bug`, `chore`, `refactor`). Ask the user for
-    confirmation using a **Yes/No question** via the question tool.
+    confirmation using a **Yes/No question** via the question tool, unless the
+    type was prefilled by `conductor-roadmap` (skip the question).
 3.  **Set Priority:** Infer a priority (`high`, `medium`, `low`) from the
     description and context. Default to `medium`. Ask the user to confirm or
     change it using a **single-choice question** via the question tool when the priority is not
-    obvious.
+    obvious or was not prefilled by `conductor-roadmap`.
 4.  **Propose Track ID:** Generate `YYYYMMDD-<slug>`:
     -   Use the current date in `YYYYMMDD` form.
     -   Lowercase the title, replace spaces and punctuation with hyphens, and
@@ -256,8 +269,9 @@ nothing behind.
     -   Read `assets/metadata.template.json`. Write
       `conductor/tracks/<track-id>/metadata.json` with:
         -   `id`, `title`, `type`, `status: "new"`, `priority`
-        -   `depends_on` from the spec's track dependencies. If it is non-empty,
-            resolve each dependency in `tracks.md`; if it is absent there, read
+        -   `depends_on` from the spec's track dependencies, or from the prefilled
+            `depends_on` supplied by `conductor-roadmap` when promoting. If it
+            is non-empty, resolve each dependency in `tracks.md`; if it is absent there, read
             `conductor/archive/<track-id>/metadata.json`. A dependency is
             satisfied only when its `metadata.status` is `complete` and its
             merge commit is an ancestor of the current base — verify live with

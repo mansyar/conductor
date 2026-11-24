@@ -1,6 +1,6 @@
 ---
 name: conductor-status
-description: Reports track progress from the registry, metadata cache, and active plans, with branch, review, PR, dependency, drift, doctor, and CI information.
+description: Reports track progress from the registry, metadata cache, and active plans, with branch, review, PR, dependency, drift, doctor, CI, and roadmap information.
 metadata:
   version: "2.0"
 ---
@@ -31,13 +31,17 @@ branches.
     `conductor/index.md` or the default path. HALT only if it is missing. If it
     is empty, report that there are no tracks and suggest
     `conductor-new-track`.
-3.  **Load the Workflow Config:** Read `git.base_branch`, `pr.enabled`, and
+3.  **Locate the Roadmap:** Resolve `conductor/roadmap.md` from
+    `conductor/index.md` or the default path. Read it when present; a missing
+    roadmap is a warning, not a halt. The roadmap records intent only — never
+    treat it as proof of a track's live state.
+4.  **Load the Workflow Config:** Read `git.base_branch`, `pr.enabled`, and
     `pr.tool` from `conductor/workflow.md`. If the workflow is missing, use
     these defaults for a key that is absent: `git.base_branch` → `main`,
     `pr.enabled` → `true`, `pr.tool` → `gh`, `pr.base` → `git.base_branch`,
     `pr.media` → `always`. When the workflow is missing, also add a warning
     that PRs are assumed enabled.
-4.  **Do Not Halt for Context Docs:** Missing `product.md`, `tech-stack.md`, or
+5.  **Do Not Halt for Context Docs:** Missing `product.md`, `tech-stack.md`, or
     `product-guidelines.md` produces a warning, not a halt. Status is a
     read-only report.
 
@@ -57,6 +61,9 @@ branches.
     may be combined with a track or `--all` for targeted checks.
 -   `status --pr`: query GitHub PR and CI state for tracks with a `pr_url`. It
     may be combined with a track, `--all`, or `--doctor`.
+-   `status --roadmap`: render the roadmap buckets with each promoted entry's
+    joined live track state and the roadmap drift checks. It may be combined
+    with `--pr`; never writes the roadmap.
 
 Never switch branches for any of these modes. `--doctor` never fixes anything;
 it reports problems and exact repair commands for the user to approve.
@@ -187,6 +194,26 @@ For each track in the current report that has a `pr_url`, and each
     without merge, show drift. PR state is never stored in metadata; a live
     query is always authoritative. Do not rewrite metadata from a read-only
     status command.
+
+### 3.5 Roadmap View (`status --roadmap`)
+
+The roadmap stores intent, not live state. Read it and join each promoted entry
+to its track's real state. Never write to the roadmap.
+
+1.  Read `conductor/roadmap.md` and parse the `Now`, `Next`, `Later`, and
+    `Dropped` tables.
+2.  For every row with a filled `track` column, read
+    `conductor/tracks/<track-id>/metadata.json` (falling back to
+    `conductor/archive/<track-id>/metadata.json`) and the registry marker in
+    `conductor/tracks.md` to derive its effective state:
+    no `track` → `idea`; `new`/`[ ]` → `scheduled`; `in_progress`/`[~]` →
+    `in progress`; `complete`/`[x]` → `complete`; `reverted`/`[-]` →
+    `abandoned`; missing track dir or metadata → `missing` (a drift warning).
+3.  Render buckets in order (`Now`, `Next`, `Later`), and inside each bucket
+    sort by priority (`high` → `medium` → `low`) then by the row's file order.
+    Show `depends_on` and flag any dependency that is unmet, dropped, or
+    complete. Render `Dropped` separately with its reason.
+4.  Run the roadmap drift checks in Section 7. Do not mutate any file.
 
 ---
 
@@ -337,6 +364,17 @@ Report every mismatch; never hide or auto-fix it:
 -   Complete with a remote and `pr.enabled: true` but `pr_url: null`.
 -   `updated_at` older than 14 days on an active or review track (stale, not
     "behind schedule").
+-   `conductor/roadmap.md` missing entirely (report as a warning; suggest
+    `conductor-setup` or `conductor-roadmap`).
+-   A roadmap entry whose `track` points to a missing track directory or
+    metadata (dangling link).
+-   A roadmap entry whose track is `complete` or `abandoned` but whose entry is
+    still in `Now` or `Next` (stale bucket).
+-   A roadmap `depends_on` referencing a `Dropped` `RM-<n>` or a
+    complete/abandoned track (unmet dependency).
+-   A roadmap row's `priority` or `depends_on` differing from the track's
+    `metadata.json` (prefer the roadmap's intent; report the mismatch).
+-   A track in `tracks.md` with no roadmap entry (informational).
 
 Warnings are informational. Do not halt unless the registry itself is missing.
 
@@ -382,6 +420,11 @@ Mode details:
     also requested.
 -   **`--pr`:** add a PR/CI table:
     `Track | PR | State | Mergeable | Review | Checks | URL`.
+-   **`--roadmap`:** add a bucketed roadmap table:
+    `Bucket | id | Title | Type | Priority | Depends on | Track | State`,
+    with the roadmap drift warnings appended. `Dropped` is a separate short
+    table with `id | Title | Reason`. State is the joined live value from
+    Section 3.5, not a stored field.
 
 If there are no tracks, say so and suggest `conductor-new-track`. Do not invent
 an empty progress report.
@@ -414,3 +457,5 @@ an empty progress report.
 -   `--doctor` reports fixes but never applies them.
 -   Never claim a subagent is running from a run file alone.
 -   Never let `--pr` failures hide the local status report.
+-   Never treat the roadmap as proof of a track's live state.
+-   Never write, stage, or commit `conductor/roadmap.md`.

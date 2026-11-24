@@ -55,6 +55,9 @@ branch-and-evidence workflow:
     changing it.
 -   **PR and CI visibility.** `conductor-status --pr` shows PR state, mergeability,
     review decision, and checks without polling.
+-   **A living roadmap.** `conductor/roadmap.md` captures ideas and follow-ups in
+    Now / Next / Later buckets. Entries store intent only; `conductor-status
+    --roadmap` joins them to live track state and reports drift.
 -   **No git notes.** Task summaries live in the plan and the evidence files.
 
 --------------------------------------------------------------------------------
@@ -464,6 +467,7 @@ Status advertises cleanup when a merged track still has a live branch.
 /conductor:conductor-status --verify
 /conductor:conductor-status --doctor
 /conductor:conductor-status --pr
+/conductor:conductor-status --roadmap
 ```
 
 Status is a factual, read-only report:
@@ -489,7 +493,35 @@ commands but never applies them.
 `--pr` queries PR state, mergeability, review decision, and checks for tracks
 with a PR URL. It does not poll or rerun checks.
 
-### 7. Revert
+`--roadmap` renders the roadmap buckets with each promoted entry joined to its
+live track state and runs read-only drift checks (dangling links, stale buckets,
+unmet or dropped dependencies). It never writes the roadmap.
+
+### 7. Roadmap
+
+`conductor/roadmap.md` is the single place for ideas and follow-ups that are not
+yet real tracks. The `conductor-roadmap` skill is its only writer:
+
+```bash
+/conductor:conductor-roadmap                 # show
+/conductor:conductor-roadmap add "..."       # capture an idea
+/conductor:conductor-roadmap refine RM-3     # reorder / reprioritize
+/conductor:conductor-roadmap promote RM-3    # create a track via new-track
+/conductor:conductor-roadmap drop RM-3       # drop with a reason
+```
+
+Rows live in `Now`, `Next`, `Later`, or `Dropped` buckets with a monotonic
+`RM-<n>` id, type, priority, `depends_on`, a `track` link once promoted, and an
+`origin` (`idea`, `manual`, `<skill>:<track-id>`) so follow-ups are traceable.
+The roadmap records *intent*, not live state — status derives the real state by
+joining the `track` link to `tracks.md` and track metadata.
+
+`conductor-new-track` prefills classification from a promoted row (skipping the
+type/priority questions), `conductor-implement` and `conductor-review` auto-capture
+out-of-scope discoveries as `Next` follow-ups, and `conductor-setup` creates the
+roadmap and links it from `conductor/index.md` for both new and upgraded projects.
+
+### 8. Revert
 
 ```bash
 /conductor:conductor-revert phase 2
@@ -528,6 +560,7 @@ There is no `git reset --hard` path.
 | `conductor/workflow.md` | Workflow Config, verification strategy, quality gates. |
 | `conductor/code_styleguides/` | Applicable style guides. |
 | `conductor/tracks.md` | Registry: `[ ]`, `[~]`, `[x]`, `[-]`. |
+| `conductor/roadmap.md` | Ideas and follow-ups in Now / Next / Later / Dropped buckets. |
 | `conductor/tracks/<id>/spec.md` | Stable `FR`/`NFR`/`AC` requirements. |
 | `conductor/tracks/<id>/plan.md` | Phases, tasks, checkpoints, results, evidence. |
 | `conductor/tracks/<id>/metadata.json` | Branch, base, progress cache, review/PR state. |
@@ -549,6 +582,11 @@ There is no `git reset --hard` path.
 | --- | --- |
 | `/conductor:conductor-setup` | Initialize context, workflow, style guides, and subagents. |
 | `/conductor:conductor-setup upgrade` | Upgrade a Conductor 1.x project without rewriting its context docs. |
+| `/conductor:conductor-roadmap` | Show the roadmap with joined live track state. |
+| `/conductor:conductor-roadmap add "..."` | Capture an idea (Now / Next / Later). |
+| `/conductor:conductor-roadmap refine RM-n` | Reorder, reprioritize, or re-depend an item. |
+| `/conductor:conductor-roadmap promote RM-n` | Turn an idea into a real track via `conductor-new-track`. |
+| `/conductor:conductor-roadmap drop RM-n` | Drop an item with a recorded reason. |
 | `/conductor:conductor-new-track` | Create a spec, plan, branch, and registry entry. |
 | `/conductor:conductor-implement` | Execute all remaining phases with subagents and verify each. |
 | `/conductor:conductor-implement next` | Execute only the next phase. |
@@ -566,6 +604,7 @@ There is no `git reset --hard` path.
 | `/conductor:conductor-status --verify` | Recompute every plan. |
 | `/conductor:conductor-status --doctor` | Check environment and Conductor integrity. |
 | `/conductor:conductor-status --pr` | Show PR, review, mergeability, and CI state. |
+| `/conductor:conductor-status --roadmap` | Show roadmap buckets with joined track state and drift checks. |
 | `/conductor:conductor-revert phase N` | Revert a phase and later verified phases. |
 | `/conductor:conductor-revert review` | Revert the latest review-fix phase. |
 | `/conductor:conductor-revert track` | Delete an unmerged track or open a revert PR. |

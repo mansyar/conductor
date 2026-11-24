@@ -63,7 +63,7 @@ Read the returned JSON object from `stdout`. **Do NOT mention the script name or
   non-empty, report them as legacy-track warnings and point to
   `conductor/migration-report.md`.
 - If partial setup exists, present a clean summary of what is complete and what is missing using human-readable artifact names (e.g., `tech-stack.md`). Do NOT use internal section numbers (e.g., avoid "Section 2.3").
-- Identify the pending step from `next_step` (e.g., "Technology Stack"). If it is `Conductor Subagents`, resume at Section 2.7. If the only gaps are `tracks.md`, the Tracks section, or `.conductor/`, resume at Section 3 (Finalization).
+- Identify the pending step from `next_step` (e.g., "Technology Stack"). If it is `Conductor Subagents`, resume at Section 2.7. If the only gaps are `tracks.md`, `roadmap.md`, the Tracks or Roadmap section, or `.conductor/`, resume at Section 3 (Finalization).
 
 ## 2. Interactive Scaffolding & Context Gathering
 
@@ -412,14 +412,17 @@ without changing anything.
 5. **Merge the Index:** If `conductor/index.md` exists, update it in place:
     - Add `<!-- conductor-version: 2 -->` after the title if it is absent.
     - Ensure the `## Tracks` section links to `./tracks.md` and `./tracks/`.
+    - Ensure the `## Roadmap` section links to `./roadmap.md`.
     - Ensure the Capabilities section links only to artifacts that exist.
     - Preserve unknown sections, custom links, and user-authored notes. Do not
       replace the file with the template.
     If `index.md` is missing, write the template from Section 3.
 
 6. **Scaffold and Ignore:** If missing, create `conductor/tracks.md` with
-   `# Tracks` and a blank line, and `conductor/tracks/.gitkeep`. Ensure
-   `.gitignore` contains `.conductor/`.
+   `# Tracks` and a blank line, `conductor/tracks/.gitkeep`, and
+   `conductor/roadmap.md` from `conductor-roadmap/assets/roadmap-template.md`.
+   Never overwrite an existing roadmap. Ensure `.gitignore` contains
+   `.conductor/`.
 
 7. **Install Current Subagents:** Run Section 2.7. On a non-OpenCode host, note
    that the skills will fall back to the host's general subagent. If the user
@@ -521,7 +524,8 @@ re-interviewing the project.
    `conductor/workflow.md` and the `## Workflow Config` block of
    `assets/workflow.md`. List the keys the template defines that the project
    does not have. Compare only this block; report other template changes as
-   informational, not as work to do.
+   informational, not as work to do. Also check that `conductor/roadmap.md`
+   exists and that `conductor/index.md` has a `## Roadmap` link to it.
 2. **Compare the Installed Agents:** On an OpenCode host, read the template
    version comment in `.opencode/agents/conductor-phase.md` and
    `.opencode/agents/conductor-reviewer.md` and compare it with the comment in
@@ -529,8 +533,9 @@ re-interviewing the project.
    Also flag an installed file that still contains a `PROJECT COMMANDS` or
    `PROJECT CHECKS` marker block.
 3. **Report:** Show one short list of what is out of date: missing config keys
-   with their defaults, stale agent files, and any other template change worth
-   knowing. When nothing is out of date, say the project is current and HALT.
+   with their defaults, stale agent files, a missing `roadmap.md` or index link,
+   and any other template change worth knowing. When nothing is out of date,
+   say the project is current and HALT.
 4. **Offer a Single-Choice Question:**
    -   **Refresh (Recommended):** add the missing config keys with their
         defaults, keep every existing value, and refresh the agent files.
@@ -541,8 +546,11 @@ re-interviewing the project.
 5. **Apply a Config Refresh:** Edit `conductor/workflow.md` in place. Keep the
    existing text, values, and ordering; add each missing key with the default
    from the template, in the template's own section. Do not reformat the file
-   and do not remove values the project set. Leave the file uncommitted and say
-   so — Conductor commits are owned by `conductor-implement`.
+   and do not remove values the project set. If `roadmap.md` is missing, create
+   it from `conductor-roadmap/assets/roadmap-template.md`; if the index lacks a
+   `## Roadmap` link, add it in place. Never overwrite an existing roadmap.
+   Leave the files uncommitted and say so — Conductor commits are owned by
+   `conductor-implement`.
 6. **Refresh the Agents:** Run Section 2.7. The agent files already exist, so
    its Keep / Replace / Back up and Replace question applies. After the
    refresh, each installed file must have no marker block and at least one
@@ -588,6 +596,10 @@ Create or merge `conductor/index.md`. This is the **Single Source of Truth** for
 -   [Tracks Registry](./tracks.md)
 -   [Tracks Directory](./tracks/)
 
+## Roadmap
+
+-   [Roadmap](./roadmap.md)
+
 ## Capabilities
 
 -   [Agent Skills](../.agents/skills/)
@@ -598,10 +610,14 @@ Create or merge `conductor/index.md`. This is the **Single Source of Truth** for
 Remove any Capabilities line that does not exist on disk. Use
 `../.opencode/skills/` for the skills link when skills were installed there.
 
-3.  **Create the Tracks Registry:** If `conductor/tracks.md` does not exist,
-    create it with `# Tracks` and a blank line. Create `conductor/tracks/` with a
-    `.gitkeep` file so the index link resolves. Ensure `conductor/index.md`
-    contains the `## Tracks` section with links to `./tracks.md` and `./tracks/`.
+3.  **Create the Tracks Registry and Roadmap:** If `conductor/tracks.md` does
+    not exist, create it with `# Tracks` and a blank line. Create
+    `conductor/tracks/` with a `.gitkeep` file so the index link resolves.
+    Ensure `conductor/index.md` contains the `## Tracks` section with links to
+    `./tracks.md` and `./tracks/`. If `conductor/roadmap.md` does not exist,
+    copy it from `conductor-roadmap/assets/roadmap-template.md`; never overwrite
+    an existing roadmap. Ensure `conductor/index.md` contains a `## Roadmap`
+    section linking to `./roadmap.md`.
 
 4.  **Ignore Runtime State:** Ensure the project's `.gitignore` contains
     `.conductor/` (create the file if needed). Do not ignore `conductor/`.

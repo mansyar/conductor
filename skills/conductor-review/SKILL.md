@@ -364,7 +364,7 @@ filed; never drop them silently.
 -   Low findings that are subjective or outside the fix phase: if
     `review.issues.group_low` is true, group them by area into one issue per
     track/area; otherwise create one issue per finding.
--   Out-of-scope discovery: one issue.
+-   Out-of-scope discovery: one issue and one roadmap follow-up (Section 8.4).
 -   Critical/High that could not be resolved: one issue, plus the override
     recorded in `review.md`.
 
@@ -434,6 +434,26 @@ If `review.issues.enabled` is false, record everything in `review.md` Debt.
 -   Commit the updated review artifact:
     `conductor(review): Record follow-up issues for track '<track-id>'` (or
     `... for revert of '<track-id>'` on a revert branch).
+
+### 8.4 Roadmap Capture
+
+For every unresolved finding filed as an issue above — and for out-of-scope
+discoveries in particular — also invoke the `conductor-roadmap` skill's
+`follow-up` operation with a one-line `title` and
+`origin: review:<track-id>` (or `origin: revert:<track-id>` on a revert branch).
+This captures a `Next` roadmap item tagged with its origin track. Never hand-edit
+`conductor/roadmap.md` yourself.
+
+-   Capture happens inside the Section 8.2 confirmation gate (or with
+    `auto_create`): **Create** files both the issue and the roadmap follow-up;
+    **Skip** files neither.
+-   If `gh` is unavailable or unauthenticated, still capture the roadmap
+    follow-up — it is local — and record the issue proposal in `review.md` Debt.
+-   Record the returned `RM-<n>` id in `review.md` Debt next to the issue link
+    and in the PR template's **Follow-ups** section, so the issue and the
+    roadmap item are cross-referenced.
+-   If `review.issues.enabled` is false, capture roadmap follow-ups for
+    out-of-scope discoveries only (the Debt still records every finding).
 
 ---
 

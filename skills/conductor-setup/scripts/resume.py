@@ -14,6 +14,7 @@ CORE_FILES = [
     "code_styleguides",
     "workflow.md",
     "tracks.md",
+    "roadmap.md",
     "index.md",
 ]
 VERSION_RE = re.compile(r"conductor[-_ ]?version\s*:\s*(\d+)", re.IGNORECASE)
@@ -167,6 +168,7 @@ def determine_resumption():
             ("code_styleguides", "Code Style Guides"),
             ("workflow.md", "Workflow Configuration"),
             ("tracks.md", "Tracks Registry"),
+            ("roadmap.md", "Roadmap"),
             ("index.md", "Index & Finalization"),
         ]
         for filename, step_name in chain:

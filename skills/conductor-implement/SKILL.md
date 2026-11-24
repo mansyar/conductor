@@ -493,6 +493,15 @@ If any check fails, go to Section 4.9.
     `status: "blocked"`, commit the state, and ask the user via the question tool. Do not mark it
     verified.
 
+### 4.10 Out-of-Scope Discoveries
+
+If a subagent or verification surfaces work that does not belong to the current
+phase contract — a bug outside `Touches`, a follow-up, or a future improvement —
+do not expand the track to absorb it. Invoke the `conductor-roadmap` skill's
+`follow-up` operation with a one-line `title` and `origin: implement:<track-id>`.
+It captures a `Next` roadmap item tagged with its origin. Report the new
+`RM-<n>` id to the user. Never hand-edit `conductor/roadmap.md` yourself.
+
 ---
 
 ## 5. Integrated Verification
